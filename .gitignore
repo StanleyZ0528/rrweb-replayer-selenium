@@ -1,0 +1,8 @@
+# Log file
+*.log
+
+# Json file
+*.json
+
+# class file
+*.class
