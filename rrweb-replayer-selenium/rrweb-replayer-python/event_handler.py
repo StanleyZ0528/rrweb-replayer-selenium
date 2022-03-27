@@ -2,6 +2,7 @@ import json
 import time
 
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 import warnings
 from selenium.webdriver.common.touch_actions import TouchActions
@@ -9,7 +10,10 @@ from selenium.webdriver.common.touch_actions import TouchActions
 
 class EventReader:
     def __init__(self, path):
-        self.driver = webdriver.Firefox()
+        # self.driver = webdriver.Firefox()
+        options = Options()
+        options.add_argument('--always-authorize-plugins=true')
+        self.driver = webdriver.Chrome(options=options)
         self.action = webdriver.ActionChains(self.driver)
         self.path = path
         self.lastTimestamp = -1
@@ -71,21 +75,32 @@ class EventReader:
     def handle_snapshot(self, event):
         print("Handling Snapshot Event...")
         node_data = event['data']['node']
-        print(node_data)
+        node_data_string = json.dumps(node_data)
+        print(node_data_string)
+        f = open("/home/stanley/Desktop/Projects/rrweb-replayer-selenium/simple-server/results/fullSnapshot.json", "w")
+        f.write(node_data_string)
+        f.close()
         self.loadDict_recursive(node_data)
         self.driver.execute_script("var rrweb_snapshot_js = document.createElement('script');"
                                    "rrweb_snapshot_js.setAttribute('src', "
                                    "'https://cdn.jsdelivr.net/npm/rrweb-snapshot@1.1.13/dist/rrweb-snapshot.js'); "
                                    "document.head.appendChild(rrweb_snapshot_js);")
         time.sleep(2)
-        self.driver.execute_script("const [snap] = rrwebSnapshot.snapshot(document);"
-                                   "const iframe = document.createElement('iframe');"
-                                   "iframe.setAttribute('width', document.body.clientWidth);"
-                                   "iframe.setAttribute('height', document.body.clientHeight);"
-                                   "iframe.style.transform = 'scale(0.8)'; // mini-me"
-                                   "document.body.appendChild(iframe);"
-                                   "const rebuildNode = rrwebSnapshot.rebuild(snap, { doc: iframe.contentDocument })[0];"
-                                   "iframe.contentDocument.querySelector('center').clientHeight;")
+        self.driver.execute_script("fetch('http://localhost:8888').then((data) => { \
+                                   console.log(data); \
+                                   const [snap1] = rrwebSnapshot.snapshot(document); \
+                                   console.log(snap1); \
+                                   const [snap] = JSON.parse(response); \
+                                   console.log(snap); \
+                                   const iframe = document.createElement('iframe'); \
+                                   iframe.setAttribute('width', document.body.clientWidth); \
+                                   iframe.setAttribute('height', document.body.clientHeight); \
+                                   iframe.style.transform = 'scale(0.8)'; \
+                                   document.body.appendChild(iframe); \
+                                   alert('Selenium is running...'); \
+                                   rrwebSnapshot.rebuild(snap, { doc: iframe.contentDocument })[0]; \
+                                   });")
+        time.sleep(200)
         print("Element Dictionary:")
         print(self.element_dict)
         return
@@ -346,5 +361,5 @@ class EventReader:
 
 
 eventReadInstance = EventReader('/home/stanley/Desktop/Projects/rrweb-replayer-selenium/simple-server/results'
-                                '/google_events_2.json')
+                                '/google_events_3.json')
 eventReadInstance.main()

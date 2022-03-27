@@ -1400,6 +1400,7 @@ var rrwebSnapshot = (function (exports) {
             case exports.NodeType.Element:
                 var tagName = getTagName(n);
                 var node_1;
+                node_1.createAttribute("rrweb_id", n.id);
                 if (n.isSVG) {
                     node_1 = doc.createElementNS('http://www.w3.org/2000/svg', tagName);
                 }
