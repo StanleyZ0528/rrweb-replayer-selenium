@@ -1,0 +1,15 @@
+{
+  "name": "rrweb-replayer-nodejs",
+  "version": "1.0.0",
+  "description": "This project aims to create a simple webpage that will be used by selenium replayer to render the replay result.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Stanley",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.17.3"
+  },
+  "devDependencies": {}
+}

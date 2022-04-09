@@ -1,23 +1,44 @@
 import json
+import subprocess
+from threading import Thread
 import time
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from Naked.toolshed.shell import execute_js
 import warnings
 from selenium.webdriver.common.touch_actions import TouchActions
+# Todo: Handle Mutation Events
+# Todo: Record Changes after routing to a new webpage
+# Todo: Miscellaneous issues related to videos, images, google map, etc.
+
+
+# Start a nodejs webpage for replay
+def runServer():
+    print('Starting server...\n')
+    subprocess.run(["node", '../../rrweb-replayer-nodejs/index.js'])
+    print('Done running server...')
 
 
 class EventReader:
     def __init__(self, path):
-        # self.driver = webdriver.Firefox()
+        # Use subprocess to start a localhost webpage for replay
+        server = Thread(target=runServer)
+        server.start()
+        # Disable webSecurity option for replay
         options = Options()
-        options.add_argument('--always-authorize-plugins=true')
+        options.add_argument('--disable-web-security')
+        # Using Chrome to do the replay for now
         self.driver = webdriver.Chrome(options=options)
         self.action = webdriver.ActionChains(self.driver)
+        # Path to rrweb recording result
         self.path = path
+        # Save the timestamp of the previous incremental event
         self.lastTimestamp = -1
+        # A dictionary that maps rrweb_id to element node
         self.element_dict = {}
+        # Initialize the position of the mouse to (0, 0)
         self.previousX = 0
         self.previousY = 0
 
@@ -26,7 +47,6 @@ class EventReader:
             fileData = json.load(f)
         pairs = fileData.items()
         for key, events in pairs:
-            # print(events)
             for event in events:
                 eventType = event['type']
                 if eventType == 0:  # DomContentLoaded
@@ -38,11 +58,9 @@ class EventReader:
                 elif eventType == 3:  # IncrementalSnapshot
                     self.handle_incrementalSnapshot(event)
                     timestamp = event['timestamp']
-                    if self.lastTimestamp == -1:
-                        self.lastTimestamp = timestamp
-                    else:
+                    if self.lastTimestamp != -1:
                         time.sleep((timestamp - self.lastTimestamp) / 1000)
-                        self.lastTimestamp = timestamp
+                    self.lastTimestamp = timestamp
                 elif eventType == 4:  # Meta
                     self.handle_meta(event)
                 elif eventType == 5:  # Custom
@@ -77,33 +95,17 @@ class EventReader:
         node_data = event['data']['node']
         node_data_string = json.dumps(node_data)
         print(node_data_string)
-        f = open("/home/stanley/Desktop/Projects/rrweb-replayer-selenium/simple-server/results/fullSnapshot.json", "w")
-        f.write(node_data_string)
-        f.close()
+        # f = open("~/Desktop/Projects/rrweb-replayer-selenium/simple-server/results/fullSnapshot.json", "w")
+        # f.write(node_data_string)
+        # f.close()
         self.loadDict_recursive(node_data)
-        self.driver.execute_script("var rrweb_snapshot_js = document.createElement('script');"
-                                   "rrweb_snapshot_js.setAttribute('src', "
-                                   "'https://cdn.jsdelivr.net/npm/rrweb-snapshot@1.1.13/dist/rrweb-snapshot.js'); "
-                                   "document.head.appendChild(rrweb_snapshot_js);")
-        time.sleep(2)
-        self.driver.execute_script("fetch('http://localhost:8888').then((data) => { \
-                                   console.log(data); \
-                                   const [snap1] = rrwebSnapshot.snapshot(document); \
-                                   console.log(snap1); \
-                                   const [snap] = JSON.parse(response); \
-                                   console.log(snap); \
-                                   const iframe = document.createElement('iframe'); \
-                                   iframe.setAttribute('width', document.body.clientWidth); \
-                                   iframe.setAttribute('height', document.body.clientHeight); \
-                                   iframe.style.transform = 'scale(0.8)'; \
-                                   document.body.appendChild(iframe); \
-                                   alert('Selenium is running...'); \
-                                   rrwebSnapshot.rebuild(snap, { doc: iframe.contentDocument })[0]; \
-                                   });")
-        time.sleep(200)
+        self.driver.execute_script("rebuildSnapshot('result/fullSnapshot.json');")
+        # elements_found_id = self.driver.find_element(By.ID, "rrweb_rebuild_button")
+        # self.action.move_to_element(elements_found_id).perform()
+        # self.action.click().perform()
+        time.sleep(.5)
         print("Element Dictionary:")
         print(self.element_dict)
-        return
 
     def handle_incrementalSnapshot(self, event):
         print("Handling IncrementalSnapshot Event...")
@@ -149,8 +151,10 @@ class EventReader:
         href = data['href']
         width = data['width']
         height = data['height']
-        self.driver.get(href)
+        # self.driver.get(href)
+        self.driver.get("http://localhost:5000")
         self.driver.set_window_size(width, height)
+        time.sleep(.5)
 
     def mutation_handler(self, data):
         print("Incremental Snapshot: Handling Mutation")
@@ -198,11 +202,11 @@ class EventReader:
             print(elements_found)
             if len(elements_found) == 1:
                 original_style = elements_found[0].get_attribute('style')
-                self.apply_style(elements_found[0], "border: 5px solid red;")
+                # Highlight the element that the mouse is currently hovering above
+                self.apply_style(elements_found[0], "border: 3px solid red;")
                 time.sleep(.2)
                 self.apply_style(elements_found[0], original_style)
-                # self.action.move_to_element(elements_found[0])
-                self.action.move_by_offset(position_x - self.previousX, position_y - self.previousY).perform()
+                self.action.move_to_element(elements_found[0])
                 self.previousX = position_x
                 self.previousY = position_y
             else:
@@ -231,6 +235,7 @@ class EventReader:
             self.action.double_click().perform()
         elif interactionType == 5:  # Focus
             print("Focus")
+            self.action.click().perform()
         elif interactionType == 6:  # Blur
             print("Blur")
             self.driver.execute_script("document.activeElement ? document.activeElement.blur() : 0")
@@ -273,8 +278,7 @@ class EventReader:
         if len(elements_found) == 1:
             elements_found[0].send_keys(input_text[-1])
         else:
-            elements_found[0].send_keys(input_text[-1])
-            # raise ValueError("Cannot decide where to input")
+            raise ValueError("Cannot decide where to input")
         return
 
     def touchMove_handler(self, data):
@@ -321,7 +325,7 @@ class EventReader:
         self.previousX = position_x_to
         self.previousY = position_y_to
         self.action.release().perform()
-        # self.action.drag_and_drop()
+        # Todo: use self.action.drag_and_drop() instead
         return
 
     def styleDeclaration_handler(self, data):
@@ -332,34 +336,38 @@ class EventReader:
         print("The information of the element trying to find:")
         element_info = self.element_dict[currId]
         print(element_info)
-        element_attributes = element_info['attributes']
-        elements_found_tagName = []
-        elements_found_class = []
-        elements_found_id = []
-        elements_found_name = []
-        if 'tagName' in element_info:
-            elements_found_tagName = self.driver.find_elements(By.TAG_NAME, element_info['tagName'])
-        if 'class' in element_attributes:
-            elements_found_class = self.driver.find_elements(By.CLASS_NAME, element_attributes['class'])
-        if 'id' in element_attributes:
-            elements_found_id = self.driver.find_elements(By.ID, element_attributes['id'])
-        if 'name' in element_attributes:
-            elements_found_name = self.driver.find_elements(By.NAME, element_attributes['name'])
-        elements_found = elements_found_tagName
-        if elements_found_class:
-            elements_found = list(set(elements_found) & set(elements_found_class))
-        if elements_found_id:
-            elements_found = list(set(elements_found) & set(elements_found_id))
-        if elements_found_name:
-            elements_found = list(set(elements_found) & set(elements_found_name))
+        # CssSelector text that is going to be used
+        cssSelectorText = element_info['tagName'] + '[rrweb_id="' + str(element_info['id']) + '"]'
+        print(cssSelectorText)
+        elements_found_rrwebId = self.driver.find_elements(By.CSS_SELECTOR, cssSelectorText)
+        # elements_found_tagName = []
+        # elements_found_class = []
+        # elements_found_id = []
+        # elements_found_name = []
+        # if 'tagName' in element_info:
+        #     elements_found_tagName = self.driver.find_elements(By.TAG_NAME, element_info['tagName'])
+        # if 'class' in element_attributes:
+        #     elements_found_class = self.driver.find_elements(By.CLASS_NAME, element_attributes['class'])
+        # if 'id' in element_attributes:
+        #     elements_found_id = self.driver.find_elements(By.ID, element_attributes['id'])
+        # if 'name' in element_attributes:
+        #     elements_found_name = self.driver.find_elements(By.NAME, element_attributes['name'])
+        # elements_found = elements_found_tagName
+        # if elements_found_class:
+        #     elements_found = list(set(elements_found) & set(elements_found_class))
+        # if elements_found_id:
+        #     elements_found = list(set(elements_found) & set(elements_found_id))
+        # if elements_found_name:
+        #     elements_found = list(set(elements_found) & set(elements_found_name))
         # print(elements_found)
-        if len(elements_found) == 0:
+        if len(elements_found_rrwebId) == 0:
+            self.driver.close()
             raise ValueError("No Element is found")
-        if len(elements_found) > 1:
+        if len(elements_found_rrwebId) > 1:
             warnings.warn("Multiple elements are found by the locator")
-        return elements_found
+        return elements_found_rrwebId
 
 
-eventReadInstance = EventReader('/home/stanley/Desktop/Projects/rrweb-replayer-selenium/simple-server/results'
-                                '/google_events_3.json')
+eventReadInstance = EventReader('/home/stanley/Desktop/Projects/rrweb-replayer-selenium/rrweb-replayer-nodejs/result'
+                                '/recordEvents.json')
 eventReadInstance.main()
