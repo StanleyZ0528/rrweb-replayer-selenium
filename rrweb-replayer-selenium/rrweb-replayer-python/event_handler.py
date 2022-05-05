@@ -2,12 +2,14 @@ import json
 import subprocess
 from threading import Thread
 import time
+import multiprocessing
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from Naked.toolshed.shell import execute_js
 import warnings
+from os.path import exists
 from selenium.webdriver.common.touch_actions import TouchActions
 # Todo: Handle Mutation Events
 # Todo: Record Changes after routing to a new webpage
@@ -24,11 +26,11 @@ def runServer():
 class EventReader:
     def __init__(self, path):
         # Use subprocess to start a localhost webpage for replay
-        server = Thread(target=runServer)
-        server.start()
+        self.server = multiprocessing.Process(target=runServer)
+        self.server.start()
         # Disable webSecurity option for replay
         options = Options()
-        options.add_argument('--disable-web-security')
+        options.add_argument('--disable-site-isolation-trials --disable-web-security --user-data-dir="/home/stanley/Desktop/Projects/rrweb-replayer-selenium/user_data/')
         # Using Chrome to do the replay for now
         self.driver = webdriver.Chrome(options=options)
         self.action = webdriver.ActionChains(self.driver)
@@ -41,34 +43,54 @@ class EventReader:
         # Initialize the position of the mouse to (0, 0)
         self.previousX = 0
         self.previousY = 0
+        self.currentPage = 0
 
     def main(self):
-        with open(self.path, 'r') as f:
-            fileData = json.load(f)
-        pairs = fileData.items()
-        for key, events in pairs:
-            for event in events:
-                eventType = event['type']
-                if eventType == 0:  # DomContentLoaded
-                    self.handle_domContentLoaded(event)
-                elif eventType == 1:  # Load
-                    self.handle_load(event)
-                elif eventType == 2:  # FullSnapshot
-                    self.handle_snapshot(event)
-                elif eventType == 3:  # IncrementalSnapshot
-                    self.handle_incrementalSnapshot(event)
-                    timestamp = event['timestamp']
-                    if self.lastTimestamp != -1:
-                        time.sleep((timestamp - self.lastTimestamp) / 1000)
-                    self.lastTimestamp = timestamp
-                elif eventType == 4:  # Meta
-                    self.handle_meta(event)
-                elif eventType == 5:  # Custom
-                    print(event['data'])
-                else:
-                    raise ValueError('Unexpected eventType')
+        while True:
+            self.currentPage += 1
+            recordPath = self.path + "record" + str(self.currentPage) + ".json"
+            print(recordPath)
+            if not exists(recordPath):
+                break
+            with open(recordPath, 'r') as f:
+                fileData = json.load(f)
+            pairs = fileData.items()
+            for key, events in pairs:
+                for event in events:
+                    eventType = event['type']
+                    if eventType == 0:  # DomContentLoaded
+                        self.handle_domContentLoaded(event)
+                    elif eventType == 1:  # Load
+                        self.handle_load(event)
+                    elif eventType == 2:  # FullSnapshot
+                        self.handle_snapshot(event)
+                    elif eventType == 3:  # IncrementalSnapshot
+                        self.handle_incrementalSnapshot(event)
+                        timestamp = event['timestamp']
+                        if self.lastTimestamp != -1:
+                            time.sleep((timestamp - self.lastTimestamp) / 1000)
+                        self.lastTimestamp = timestamp
+                    elif eventType == 4:  # Meta
+                        self.handle_meta(event)
+                    elif eventType == 5:  # Custom
+                        print(event['data'])
+                    else:
+                        raise ValueError('Unexpected eventType')
+                    print(self.driver.current_url)
+                    if self.driver.current_url != "http://localhost:5000/":
+                        break
+            # Save the timestamp of the previous incremental event
+            # self.lastTimestamp = -1
+            # A dictionary that maps rrweb_id to element node
+            self.element_dict = {}
+            # Initialize the position of the mouse to (0, 0)
+            # self.previousX = 0
+            # self.previousY = 0
+            print("Page" + str(self.currentPage) + " finished")
+            time.sleep(1)
         time.sleep(5)
         self.driver.close()
+        self.server.terminate()
 
     def handle_domContentLoaded(self, event):
         print("Handling DomContentLoaded Event...")
@@ -94,15 +116,18 @@ class EventReader:
         print("Handling Snapshot Event...")
         node_data = event['data']['node']
         node_data_string = json.dumps(node_data)
-        print(node_data_string)
+        # print(node_data_string)
         # f = open("~/Desktop/Projects/rrweb-replayer-selenium/simple-server/results/fullSnapshot.json", "w")
         # f.write(node_data_string)
         # f.close()
         self.loadDict_recursive(node_data)
-        self.driver.execute_script("rebuildSnapshot('result/fullSnapshot.json');")
+        snapshotPath = "result/snapshot" + str(self.currentPage) + ".json"
+        print(snapshotPath)
+        self.driver.execute_script("rebuildSnapshot('" + snapshotPath + "');")
         # elements_found_id = self.driver.find_element(By.ID, "rrweb_rebuild_button")
         # self.action.move_to_element(elements_found_id).perform()
         # self.action.click().perform()
+        self.driver.execute_script("ForbidRedirect();")
         time.sleep(.5)
         print("Element Dictionary:")
         print(self.element_dict)
@@ -158,6 +183,7 @@ class EventReader:
 
     def mutation_handler(self, data):
         print("Incremental Snapshot: Handling Mutation")
+        print(data)
         texts = data['texts']
         attributes = data['attributes']
         removes = data['removes']
@@ -169,8 +195,16 @@ class EventReader:
                 if 'childNodes' in node:
                     del node['childNodes']
                 print("Add Node:")
+                if 'tagName' not in node:
+                    node['tagName'] = 'span'
                 self.element_dict[node['id']] = node
                 print(self.element_dict[node['id']])
+                aNodeInfo = dict(i)
+                aNodeInfo['tagName'] = self.element_dict[i['parentId']]['tagName']
+                print(self.element_dict[i['parentId']])
+                print(aNodeInfo)
+                print("AddNode({})".format(json.dumps(aNodeInfo)))
+                self.driver.execute_script("AddNode({})".format(json.dumps(aNodeInfo)))
 
         if attributes:
             for i in attributes:
@@ -178,12 +212,22 @@ class EventReader:
                     self.element_dict[i['id']]['attributes'][key] = value
                 print("Change Node:")
                 print(self.element_dict[i['id']])
+                cNodeInfo = dict(i)
+                cNodeInfo['tagName'] = self.element_dict[i['id']]['tagName']
+                print(cNodeInfo)
+                print("ChangeNode({})".format(json.dumps(cNodeInfo)))
+                self.driver.execute_script("ChangeNode({})".format(json.dumps(cNodeInfo)))
 
         if removes:
             for i in removes:
                 print("Delete Node:")
                 print(self.element_dict[i['id']])
+                rNodeInfo = dict(i)
+                rNodeInfo['tagName'] = self.element_dict[i['id']]['tagName']
                 del self.element_dict[i['id']]
+                print(rNodeInfo)
+                print("RemoveNode({})".format(json.dumps(rNodeInfo)))
+                self.driver.execute_script("RemoveNode({})".format(json.dumps(rNodeInfo)))
         return
 
     def apply_style(self, element, s):
@@ -271,6 +315,8 @@ class EventReader:
         input_isChecked = data['isChecked']
         input_id = data['id']
         elements_found = self.getElementById(input_id)
+        if len(elements_found) == 0:
+            raise ValueError("Cannot decide where to input")
         print("Elements found:")
         print(elements_found)
         if input_text == '':
@@ -361,13 +407,13 @@ class EventReader:
         #     elements_found = list(set(elements_found) & set(elements_found_name))
         # print(elements_found)
         if len(elements_found_rrwebId) == 0:
-            self.driver.close()
-            raise ValueError("No Element is found")
+            # self.driver.close()
+            # raise ValueError("No Element is found")
+            warnings.warn("No Element is found")
         if len(elements_found_rrwebId) > 1:
             warnings.warn("Multiple elements are found by the locator")
         return elements_found_rrwebId
 
 
-eventReadInstance = EventReader('/home/stanley/Desktop/Projects/rrweb-replayer-selenium/rrweb-replayer-nodejs/result'
-                                '/recordEvents.json')
+eventReadInstance = EventReader('/home/stanley/Desktop/Projects/rrweb-replayer-selenium/rrweb-recorder-nodejs/results/')
 eventReadInstance.main()
