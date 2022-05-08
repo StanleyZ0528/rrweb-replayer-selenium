@@ -11,15 +11,12 @@ from Naked.toolshed.shell import execute_js
 import warnings
 from os.path import exists
 from selenium.webdriver.common.touch_actions import TouchActions
-# Todo: Handle Mutation Events
-# Todo: Record Changes after routing to a new webpage
-# Todo: Miscellaneous issues related to videos, images, google map, etc.
 
 
 # Start a nodejs webpage for replay
 def runServer():
     print('Starting server...\n')
-    subprocess.run(["node", '../../rrweb-replayer-nodejs/index.js'])
+    subprocess.run(["node", '../rrweb-replayer-nodejs/index.js'])
     print('Done running server...')
 
 
@@ -30,7 +27,7 @@ class EventReader:
         self.server.start()
         # Disable webSecurity option for replay
         options = Options()
-        options.add_argument('--disable-site-isolation-trials --disable-web-security --user-data-dir="/home/stanley/Desktop/Projects/rrweb-replayer-selenium/user_data/')
+        options.add_argument('--disable-web-security')
         # Using Chrome to do the replay for now
         self.driver = webdriver.Chrome(options=options)
         self.action = webdriver.ActionChains(self.driver)
@@ -121,7 +118,7 @@ class EventReader:
         # f.write(node_data_string)
         # f.close()
         self.loadDict_recursive(node_data)
-        snapshotPath = "result/snapshot" + str(self.currentPage) + ".json"
+        snapshotPath = "results/snapshot" + str(self.currentPage) + ".json"
         print(snapshotPath)
         self.driver.execute_script("rebuildSnapshot('" + snapshotPath + "');")
         # elements_found_id = self.driver.find_element(By.ID, "rrweb_rebuild_button")
@@ -129,8 +126,8 @@ class EventReader:
         # self.action.click().perform()
         self.driver.execute_script("ForbidRedirect();")
         time.sleep(.5)
-        print("Element Dictionary:")
-        print(self.element_dict)
+        # print("Element Dictionary:")
+        # print(self.element_dict)
 
     def handle_incrementalSnapshot(self, event):
         print("Handling IncrementalSnapshot Event...")
@@ -415,5 +412,5 @@ class EventReader:
         return elements_found_rrwebId
 
 
-eventReadInstance = EventReader('/home/stanley/Desktop/Projects/rrweb-replayer-selenium/rrweb-recorder-nodejs/results/')
+eventReadInstance = EventReader('../rrweb-replayer-nodejs/results/')
 eventReadInstance.main()

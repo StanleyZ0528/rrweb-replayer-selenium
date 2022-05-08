@@ -51,7 +51,8 @@ function logEvents() {
 function waitForConnection() {
     // Get status of the server to check whether it is on or not
     fetch("http://localhost:8000", {
-        method: 'GET'
+        method: 'POST',
+        body: 'Server Status'
     }).then(response => response.text())
     .then(function(text) {
         console.log(text);
@@ -70,7 +71,7 @@ function waitForConnection() {
                     console.log(response)
                 });
                 const time = Date.now();
-                while ((Date.now() - time) < 1500) {
+                while ((Date.now() - time) < 500) {
                 }
                 return true;
                 // event.returnValue = 'Are you sure you want to leave?';

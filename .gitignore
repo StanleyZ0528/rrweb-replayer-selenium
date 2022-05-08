@@ -3,6 +3,11 @@
 
 # Json file
 *.json
+!package.json
+!package-lock.json
 
 # class file
 *.class
+
+# bash scripts
+*.sh

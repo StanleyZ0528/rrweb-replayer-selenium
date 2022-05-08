@@ -1,0 +1,12 @@
+{
+  "name": "rrweb-recorder-nodejs",
+  "version": "1.0.0",
+  "description": "RRweb recorder webserver to record a user session",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Stanley",
+  "license": "ISC",
+  "dependencies": {}
+}
