@@ -1,16 +1,13 @@
-import json
 import subprocess
-from threading import Thread
 import time
 import multiprocessing
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from Naked.toolshed.shell import execute_js
 import warnings
 from os.path import exists
-from selenium.webdriver.common.touch_actions import TouchActions
+import json
 
 
 # Start a nodejs webpage for replay
@@ -33,18 +30,25 @@ class EventReader:
         self.action = webdriver.ActionChains(self.driver)
         # Path to rrweb recording result
         self.path = path
+        # Path to create a file that will be temporarily used to recreate snapshot
+        self.writePath = '../rrweb-replayer-nodejs/results/snapshot.json'
         # Save the timestamp of the previous incremental event
         self.lastTimestamp = -1
         # A dictionary that maps rrweb_id to element node
         self.element_dict = {}
-        # Initialize the position of the mouse to (0, 0)
-        self.previousX = 0
-        self.previousY = 0
+        # Current page number
         self.currentPage = 0
+        # Current snapshot number
+        self.currentSnapshot = 0
+        # Count the mutation event number
+        self.mutationCounter = 0
+        # source of the previous URL
+        self.lastSource = ""
 
     def main(self):
         while True:
             self.currentPage += 1
+            # Load the path for the set of recorded events
             recordPath = self.path + "record" + str(self.currentPage) + ".json"
             print(recordPath)
             if not exists(recordPath):
@@ -74,15 +78,13 @@ class EventReader:
                     else:
                         raise ValueError('Unexpected eventType')
                     print(self.driver.current_url)
+                    # Replay server running on port 5000
                     if self.driver.current_url != "http://localhost:5000/":
                         break
             # Save the timestamp of the previous incremental event
             # self.lastTimestamp = -1
             # A dictionary that maps rrweb_id to element node
             self.element_dict = {}
-            # Initialize the position of the mouse to (0, 0)
-            # self.previousX = 0
-            # self.previousY = 0
             print("Page" + str(self.currentPage) + " finished")
             time.sleep(1)
         time.sleep(5)
@@ -99,44 +101,63 @@ class EventReader:
         print(event)
         return
 
+    # Load the dictionary of all DOM nodes indexed by rrweb id for locating elements
     def loadDict_recursive(self, currNode):
         if 'childNodes' not in currNode:
             return
         for node in currNode['childNodes']:
             self.loadDict_recursive(node)
-            if 'childNodes' in node:
-                del node['childNodes']
-            self.element_dict[node['id']] = node
+            node_copy = dict(node)
+            if 'childNodes' in node_copy:
+                del node_copy['childNodes']
+            self.element_dict[node_copy['id']] = node_copy
+            # For textNode since there is no tagName, save the id of its parent node
+            if 'tagName' not in node_copy and 'textContent' in node_copy:
+                self.element_dict[node_copy['id']]['parentId'] = currNode['id']
         return
 
     def handle_snapshot(self, event):
         print("Handling Snapshot Event...")
-        node_data = event['data']['node']
-        node_data_string = json.dumps(node_data)
-        # print(node_data_string)
-        # f = open("~/Desktop/Projects/rrweb-replayer-selenium/simple-server/results/fullSnapshot.json", "w")
-        # f.write(node_data_string)
-        # f.close()
-        self.loadDict_recursive(node_data)
-        snapshotPath = "results/snapshot" + str(self.currentPage) + ".json"
+        self.currentSnapshot += 1
+        snapshotPath = "results/snapshot" + str(self.currentSnapshot) + ".json"
         print(snapshotPath)
+        snapshotFilePath = self.path + "snapshot" + str(self.currentSnapshot) + ".json"
+        with open(snapshotFilePath, 'r') as f:
+            fileData = json.load(f)
+        pairs = fileData.items()
+        self.element_dict = {}
+        for key, events in pairs:
+            self.loadDict_recursive(events)
         self.driver.execute_script("rebuildSnapshot('" + snapshotPath + "');")
-        # elements_found_id = self.driver.find_element(By.ID, "rrweb_rebuild_button")
-        # self.action.move_to_element(elements_found_id).perform()
-        # self.action.click().perform()
-        self.driver.execute_script("ForbidRedirect();")
+        # self.driver.execute_script("ForbidRedirect();")
         time.sleep(.5)
-        # print("Element Dictionary:")
-        # print(self.element_dict)
+
+    def handle_mutation_as_snapshot(self, data):
+        print("Handling Mutation Event as Snapshot")
+        snap = data['snap']
+        snapshot = {"snap": snap}
+        with open(self.writePath, 'w') as f:
+            json.dump(snapshot, f, ensure_ascii=False)
+        snapshotPath = "results/snapshot.json"
+        self.driver.execute_script("rebuildSnapshot('" + snapshotPath + "');")
+        # Check if mutation event changes the previous snapshot
+        newSource = self.driver.page_source
+        if newSource != self.lastSource:
+            print("Mutation occurs: " + str(self.mutationCounter))
+            self.element_dict = {}
+            self.loadDict_recursive(snap)
+        else:
+            warnings.warn("No mutation from snapshot:" + str(self.mutationCounter))
+        self.mutationCounter += 1
+        self.lastSource = newSource
 
     def handle_incrementalSnapshot(self, event):
         print("Handling IncrementalSnapshot Event...")
         data = event['data']
         timestamp = event['timestamp']
         source = data['source']
-        print(event)
         if source == 0:  # Mutation
-            self.mutation_handler(data)
+            self.handle_mutation_as_snapshot(data)
         elif source == 1:  # MouseMove
             self.mouseMove_handler(data)
         elif source == 2:  # MouseInteraction
@@ -178,58 +199,125 @@ class EventReader:
         self.driver.set_window_size(width, height)
         time.sleep(.5)
 
-    def mutation_handler(self, data):
-        print("Incremental Snapshot: Handling Mutation")
-        print(data)
-        texts = data['texts']
-        attributes = data['attributes']
-        removes = data['removes']
-        adds = data['adds']
-        if adds:
-            for i in adds:
-                node = i['node']
-                self.loadDict_recursive(node)
-                if 'childNodes' in node:
-                    del node['childNodes']
-                print("Add Node:")
-                if 'tagName' not in node:
-                    node['tagName'] = 'span'
-                self.element_dict[node['id']] = node
-                print(self.element_dict[node['id']])
-                aNodeInfo = dict(i)
-                aNodeInfo['tagName'] = self.element_dict[i['parentId']]['tagName']
-                print(self.element_dict[i['parentId']])
-                print(aNodeInfo)
-                print("AddNode({})".format(json.dumps(aNodeInfo)))
-                self.driver.execute_script("AddNode({})".format(json.dumps(aNodeInfo)))
-
-        if attributes:
-            for i in attributes:
-                for key, value in i['attributes'].items():
-                    self.element_dict[i['id']]['attributes'][key] = value
-                print("Change Node:")
-                print(self.element_dict[i['id']])
-                cNodeInfo = dict(i)
-                cNodeInfo['tagName'] = self.element_dict[i['id']]['tagName']
-                print(cNodeInfo)
-                print("ChangeNode({})".format(json.dumps(cNodeInfo)))
-                self.driver.execute_script("ChangeNode({})".format(json.dumps(cNodeInfo)))
-
-        if removes:
-            for i in removes:
-                print("Delete Node:")
-                print(self.element_dict[i['id']])
-                rNodeInfo = dict(i)
-                rNodeInfo['tagName'] = self.element_dict[i['id']]['tagName']
-                del self.element_dict[i['id']]
-                print(rNodeInfo)
-                print("RemoveNode({})".format(json.dumps(rNodeInfo)))
-                self.driver.execute_script("RemoveNode({})".format(json.dumps(rNodeInfo)))
-        return
+    # def addNode_recursive(self, currNode, parentId):
+    #     if 'childNodes' not in currNode:
+    #         return
+    #     node_list = []
+    #     for node in currNode['childNodes']:
+    #         node_list.append(node)
+    #         node_copy = dict(node)
+    #         if 'childNodes' in node_copy:
+    #             del node_copy['childNodes']
+    #         if 'tagName' not in node and 'textContent' not in node:
+    #             continue
+    #         print("Add Node:")
+    #         if 'tagName' not in node and 'textContent' in node:
+    #             node_copy['parentId'] = currNode['id']
+    #         self.element_dict[node_copy['id']] = node_copy
+    #         print(self.element_dict[node_copy['id']])
+    #         print(parentId)
+    #         print(self.element_dict[parentId])
+    #         aNodeInfo = {'node': node_copy, 'parentId': currNode['id'], 'nextId': None}
+    #         if 'tagName' in self.element_dict[currNode['id']]:
+    #             aNodeInfo['tagName'] = self.element_dict[currNode['id']]['tagName']
+    #         elif 'parentId' in self.element_dict[currNode['id']]:
+    #             aNodeInfo['ancestorTagName'] = \
+    #                 self.element_dict[self.element_dict[currNode['id']]['parentId']]['tagName']
+    #             aNodeInfo['ancestorId'] = self.element_dict[self.element_dict[currNode['id']]['parentId']]
+    #             aNodeInfo['textContent'] = self.element_dict[currNode['id']['textContent']]
+    #         else:
+    #             warnings.warn("Can not find parent of adding node")
+    #             return
+    #         print(self.element_dict[parentId])
+    #         print(aNodeInfo)
+    #         print("AddNode({})".format(json.dumps(aNodeInfo)))
+    #         self.driver.execute_script("AddNode({})".format(json.dumps(aNodeInfo)))
+    #     for node in node_list:
+    #         self.addNode_recursive(node, currNode['id'])
+    #     return
+    #
+    # def mutation_handler(self, data):
+    #     print("Incremental Snapshot: Handling Mutation")
+    #     # print(data)
+    #     texts = data['texts']
+    #     attributes = data['attributes']
+    #     removes = data['removes']
+    #     adds = data['adds']
+    #     if adds:
+    #         for i in adds:
+    #             node = i['node']
+    #             self.loadDict_recursive(node)
+    #             node_copy = dict(node)
+    #             if 'childNodes' in node_copy:
+    #                 del node_copy['childNodes']
+    #             if 'tagName' not in node and 'textContent' not in node:
+    #                 continue
+    #             print("Add Node:")
+    #             if 'tagName' not in node and 'textContent' in node:
+    #                 node_copy['parentId'] = i['parentId']
+    #             self.element_dict[node_copy['id']] = node_copy
+    #             print(self.element_dict[node_copy['id']])
+    #             parentId = i['parentId']
+    #             print(parentId)
+    #             print(self.element_dict[parentId])
+    #             aNodeInfo = {'node': node_copy, 'parentId': parentId, 'nextId': None}
+    #             if 'tagName' in self.element_dict[parentId]:
+    #                 aNodeInfo['tagName'] = self.element_dict[parentId]['tagName']
+    #             elif 'parentId' in self.element_dict[parentId]:
+    #                 aNodeInfo['ancestorTagName'] = \
+    #                     self.element_dict[self.element_dict[parentId]['parentId']]['tagName']
+    #                 aNodeInfo['ancestorId'] = self.element_dict[self.element_dict[parentId]['parentId']]
+    #                 aNodeInfo['textContent'] = self.element_dict[parentId]['textContent']
+    #             else:
+    #                 warnings.warn("Can not find parent of adding node")
+    #                 return
+    #             print(self.element_dict[parentId])
+    #             print(aNodeInfo)
+    #             print("AddNode({})".format(json.dumps(aNodeInfo)))
+    #             self.driver.execute_script("AddNode({})".format(json.dumps(aNodeInfo)))
+    #             self.addNode_recursive(node, i['parentId'])
+    #
+    #     if attributes:
+    #         for i in attributes:
+    #             print(i)
+    #             if i['id'] not in self.element_dict or 'tagName' not in i:
+    #                 continue
+    #             print(self.element_dict[i['id']])
+    #             for key, value in i['attributes'].items():
+    #                 if 'attributes' not in self.element_dict[i['id']]:
+    #                     self.element_dict[i['id']]['attributes'] = {}
+    #                 self.element_dict[i['id']]['attributes'][key] = value
+    #             print("Change Node:")
+    #             print(self.element_dict[i['id']])
+    #             cNodeInfo = dict(i)
+    #             cNodeInfo['tagName'] = self.element_dict[i['id']]['tagName']
+    #             print(cNodeInfo)
+    #             print("ChangeNode({})".format(json.dumps(cNodeInfo)))
+    #             self.driver.execute_script("ChangeNode({})".format(json.dumps(cNodeInfo)))
+    #
+    #     if removes:
+    #         for i in removes:
+    #             if i['id'] not in self.element_dict:
+    #                 continue
+    #             print("Delete Node:")
+    #             print(self.element_dict[i['id']])
+    #             rNodeInfo = dict(i)
+    #             if 'tagName' in self.element_dict[i['id']]:
+    #                 rNodeInfo['tagName'] = self.element_dict[i['id']]['tagName']
+    #             else:
+    #                 if 'tagName' not in self.element_dict[i['parentId']]:
+    #                     del self.element_dict[i['id']]
+    #                     continue
+    #                 rNodeInfo['tagName'] = ""
+    #                 rNodeInfo['parentTagName'] = self.element_dict[i['parentId']]['tagName']
+    #             del self.element_dict[i['id']]
+    #             print(rNodeInfo)
+    #             print("RemoveNode({})".format(json.dumps(rNodeInfo)))
+    #             self.driver.execute_script("RemoveNode({})".format(json.dumps(rNodeInfo)))
+    #     return
 
     def apply_style(self, element, s):
-        self.driver.execute_script("arguments[0].setAttribute('style', arguments[1]);",
-                                   element, s)
+        self.driver.execute_script("arguments[0].setAttribute('style', arguments[1]);", element, s)
 
     def mouseMove_handler(self, data):
         print("Incremental Snapshot: Handling Mouse Move")
@@ -238,35 +326,47 @@ class EventReader:
             position_x = position['x']
             position_y = position['y']
             position_id = position['id']
-            elements_found = self.getElementById(position_id)
-            print("Elements found:")
-            print(elements_found)
-            if len(elements_found) == 1:
-                original_style = elements_found[0].get_attribute('style')
-                # Highlight the element that the mouse is currently hovering above
-                self.apply_style(elements_found[0], "border: 3px solid red;")
-                time.sleep(.2)
-                self.apply_style(elements_found[0], original_style)
-                self.action.move_to_element(elements_found[0])
-                self.previousX = position_x
-                self.previousY = position_y
-            else:
-                self.action.move_by_offset(position_x - self.previousX, position_y - self.previousY).perform()
-                self.previousX = position_x
-                self.previousY = position_y
+            element = self.getElementById(position_id)
+            if element is None:
+                print("No element is found, ignore mouse move")
+                continue
+            print("Element found:")
+            print(element)
+            original_style = element.get_attribute('style')
+            # Highlight the element that the mouse is currently hovering above
+            self.apply_style(element, "border: 3px solid red;")
+            time.sleep(.2)
+            self.apply_style(element, original_style)
+            try:
+                self.action.move_to_element(element).perform()
+            except:
+                print("Can't move to this element")
         return
 
     def mouseInteraction_handler(self, data):
         print("Incremental Snapshot: Handling Mouse Interaction")
+        return
         interactionType = data['type']
+        position_id = data['id']
+        element = self.getElementById(position_id)
+        if element is None:
+            print("No element is found, ignore mouse move")
+            return
+        original_style = element.get_attribute('style')
+        self.apply_style(element, "border: 3px solid red;")
+        time.sleep(.2)
+        self.apply_style(element, original_style)
         if interactionType == 0:  # Mouse Up
             print("Mouse Up")
+            self.action.move_to_element(element)
             self.action.release().perform()
         elif interactionType == 1:  # Mouse Down
             print("Mouse Down")
+            self.action.move_to_element(element)
             self.action.click_and_hold().perform()
         elif interactionType == 2:  # Click
             print("Click")
+            self.action.move_to_element(element)
             self.action.click().perform()
         elif interactionType == 3:  # ContextMenu
             print("ContextMenu")
@@ -276,10 +376,12 @@ class EventReader:
             self.action.double_click().perform()
         elif interactionType == 5:  # Focus
             print("Focus")
+            self.action.move_to_element(element)
             self.action.click().perform()
         elif interactionType == 6:  # Blur
             print("Blur")
             self.driver.execute_script("document.activeElement ? document.activeElement.blur() : 0")
+        # Touch moves are not currently handled
         elif interactionType == 7:  # Touch Start
             print("Touch Start")
         elif interactionType == 8:  # TouchMove Departed
@@ -311,18 +413,17 @@ class EventReader:
         input_text = data['text']
         input_isChecked = data['isChecked']
         input_id = data['id']
-        elements_found = self.getElementById(input_id)
-        if len(elements_found) == 0:
-            raise ValueError("Cannot decide where to input")
-        print("Elements found:")
-        print(elements_found)
-        if input_text == '':
+        element = self.getElementById(input_id)
+        if element is None:
+            warnings.warn("Cannot decide where to input")
             return
-        if len(elements_found) == 1:
-            elements_found[0].send_keys(input_text[-1])
-        else:
-            raise ValueError("Cannot decide where to input")
-        return
+        print("Element found:")
+        print(element)
+        if 'attributes' in self.element_dict[input_id] and 'type' in self.element_dict[input_id]['attributes'] and \
+                self.element_dict[input_id]['attributes']['type'] == 'hidden':
+            print("Do not need to handle hidden input")
+            return
+        self.driver.execute_script("arguments[0].value=arguments[1]", element, input_text)
 
     def touchMove_handler(self, data):
         print("Incremental Snapshot: Handling Touch Move")
@@ -356,18 +457,16 @@ class EventReader:
     def drag_handler(self, data):
         print("Incremental Snapshot: Handling Drag")
         positions = data['positions']
-        position_x_from = positions[0]['x']
-        position_y_from = positions[0]['y']
-        self.action.move_by_offset(position_x_from - self.previousX, position_y_from - self.previousY).perform()
-        self.previousX = position_x_from
-        self.previousY = position_y_from
-        self.action.click_and_hold()
-        position_x_to = positions[-1]['x']
-        position_y_to = positions[-1]['y']
-        self.action.move_by_offset(position_x_to - self.previousX, position_y_to - self.previousY).perform()
-        self.previousX = position_x_to
-        self.previousY = position_y_to
-        self.action.release().perform()
+        position_id_from = positions[0]['id']
+        element_from = self.getElementById(position_id_from)
+        if element_from is None:
+            print("From element is not found, ignore drag")
+        position_id_to = positions[-1]['id']
+        element_to = self.getElementById(position_id_to)
+        if element_to is None:
+            print("To element is not found, ignore drag")
+            return
+        self.action.drag_and_drop(element_from, element_to)
         # Todo: use self.action.drag_and_drop() instead
         return
 
@@ -379,37 +478,25 @@ class EventReader:
         print("The information of the element trying to find:")
         element_info = self.element_dict[currId]
         print(element_info)
+        while 'tagName' not in element_info:
+            if 'parentId' not in element_info:
+                warnings.warn("Can not locate this element")
+                return []
+            element_info = self.element_dict[element_info['parentId']]
+            print("Getting parent node of text node:")
+            print(element_info)
         # CssSelector text that is going to be used
         cssSelectorText = element_info['tagName'] + '[rrweb_id="' + str(element_info['id']) + '"]'
         print(cssSelectorText)
         elements_found_rrwebId = self.driver.find_elements(By.CSS_SELECTOR, cssSelectorText)
-        # elements_found_tagName = []
-        # elements_found_class = []
-        # elements_found_id = []
-        # elements_found_name = []
-        # if 'tagName' in element_info:
-        #     elements_found_tagName = self.driver.find_elements(By.TAG_NAME, element_info['tagName'])
-        # if 'class' in element_attributes:
-        #     elements_found_class = self.driver.find_elements(By.CLASS_NAME, element_attributes['class'])
-        # if 'id' in element_attributes:
-        #     elements_found_id = self.driver.find_elements(By.ID, element_attributes['id'])
-        # if 'name' in element_attributes:
-        #     elements_found_name = self.driver.find_elements(By.NAME, element_attributes['name'])
-        # elements_found = elements_found_tagName
-        # if elements_found_class:
-        #     elements_found = list(set(elements_found) & set(elements_found_class))
-        # if elements_found_id:
-        #     elements_found = list(set(elements_found) & set(elements_found_id))
-        # if elements_found_name:
-        #     elements_found = list(set(elements_found) & set(elements_found_name))
-        # print(elements_found)
         if len(elements_found_rrwebId) == 0:
-            # self.driver.close()
-            # raise ValueError("No Element is found")
             warnings.warn("No Element is found")
+            return None
         if len(elements_found_rrwebId) > 1:
             warnings.warn("Multiple elements are found by the locator")
-        return elements_found_rrwebId
+            print(elements_found_rrwebId)
+            return elements_found_rrwebId[0]
+        return elements_found_rrwebId[0]
 
 
 eventReadInstance = EventReader('../rrweb-replayer-nodejs/results/')

@@ -70,11 +70,15 @@
         document.getElementById("serverStatus").innerHTML = text;
       });
     }
+    function refreshStatus() {
+      getStatus();
+      setTimeout(refreshStatus, 250);
+    }
   </script>
   <h1 id="serverStatus"></h1>
   <p>Press shift+alt+s to toggle</p>
   <script>
-    getStatus();
+    refreshStatus();
     window.addEventListener('keydown', function(e){
       if (e.shiftKey && e.altKey && e.key.toLowerCase() === "s") {
         console.log("Shortcut Press detected");
