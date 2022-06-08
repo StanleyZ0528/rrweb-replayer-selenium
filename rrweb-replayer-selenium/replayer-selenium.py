@@ -18,7 +18,7 @@ def runServer():
 
 
 class EventReader:
-    def __init__(self, path):
+    def __init__(self, path, user_session):
         # Use subprocess to start a localhost webpage for replay
         self.server = multiprocessing.Process(target=runServer)
         self.server.start()
@@ -30,8 +30,10 @@ class EventReader:
         self.action = webdriver.ActionChains(self.driver)
         # Path to rrweb recording result
         self.path = path
+        # Which user session to replay
+        self.user_session = user_session
         # Path to create a file that will be temporarily used to recreate snapshot
-        self.writePath = '../rrweb-replayer-nodejs/results/snapshot.json'
+        self.writePath = path + 'snapshot.json'
         # Save the timestamp of the previous incremental event
         self.lastTimestamp = -1
         # A dictionary that maps rrweb_id to element node
@@ -44,12 +46,14 @@ class EventReader:
         self.mutationCounter = 0
         # source of the previous URL
         self.lastSource = ""
+        self.lastSnap = {}
+        self.newSnapshot = False
 
     def main(self):
         while True:
-            self.currentPage += 1
             # Load the path for the set of recorded events
             recordPath = self.path + "record" + str(self.currentPage) + ".json"
+            self.currentPage += 1
             print(recordPath)
             if not exists(recordPath):
                 break
@@ -68,8 +72,8 @@ class EventReader:
                     elif eventType == 3:  # IncrementalSnapshot
                         self.handle_incrementalSnapshot(event)
                         timestamp = event['timestamp']
-                        if self.lastTimestamp != -1:
-                            time.sleep((timestamp - self.lastTimestamp) / 1000)
+                        # if self.lastTimestamp != -1:
+                        #     time.sleep((timestamp - self.lastTimestamp) / 1000)
                         self.lastTimestamp = timestamp
                     elif eventType == 4:  # Meta
                         self.handle_meta(event)
@@ -81,6 +85,7 @@ class EventReader:
                     # Replay server running on port 5000
                     if self.driver.current_url != "http://localhost:5000/":
                         break
+                break
             # Save the timestamp of the previous incremental event
             # self.lastTimestamp = -1
             # A dictionary that maps rrweb_id to element node
@@ -118,10 +123,11 @@ class EventReader:
 
     def handle_snapshot(self, event):
         print("Handling Snapshot Event...")
-        self.currentSnapshot += 1
-        snapshotPath = "results/snapshot" + str(self.currentSnapshot) + ".json"
+        snapshotPath = "results/user_session" + str(self.user_session) + "/snapshot" + str(self.currentSnapshot)\
+                       + ".json"
         print(snapshotPath)
         snapshotFilePath = self.path + "snapshot" + str(self.currentSnapshot) + ".json"
+        self.currentSnapshot += 1
         with open(snapshotFilePath, 'r') as f:
             fileData = json.load(f)
         pairs = fileData.items()
@@ -134,22 +140,38 @@ class EventReader:
 
     def handle_mutation_as_snapshot(self, data):
         print("Handling Mutation Event as Snapshot")
-        snap = data['snap']
-        snapshot = {"snap": snap}
+        self.lastSnap = data['snap']
+        snapshot = {"snap": self.lastSnap}
         with open(self.writePath, 'w') as f:
             json.dump(snapshot, f, ensure_ascii=False)
-        snapshotPath = "results/snapshot.json"
+        self.newSnapshot = False
+        snapshotPath = "results/user_session" + str(self.user_session) + "/snapshot.json"
         self.driver.execute_script("rebuildSnapshot('" + snapshotPath + "');")
         # Check if mutation event changes the previous snapshot
         newSource = self.driver.page_source
         if newSource != self.lastSource:
             print("Mutation occurs: " + str(self.mutationCounter))
             self.element_dict = {}
-            self.loadDict_recursive(snap)
+            self.loadDict_recursive(self.lastSnap)
         else:
             warnings.warn("No mutation from snapshot:" + str(self.mutationCounter))
         self.mutationCounter += 1
         self.lastSource = newSource
+
+    def rebuild_snapshot(self):
+        snapshotPath = "results/user_session" + str(self.user_session) + "/snapshot.json"
+        self.driver.execute_script("rebuildSnapshot('" + snapshotPath + "');")
+        # Check if mutation event changes the previous snapshot
+        newSource = self.driver.page_source
+        if newSource != self.lastSource:
+            print("Mutation occurs: " + str(self.mutationCounter))
+            self.element_dict = {}
+            self.loadDict_recursive(self.lastSnap)
+        else:
+            warnings.warn("No mutation from snapshot:" + str(self.mutationCounter))
+        self.mutationCounter += 1
+        self.lastSource = newSource
+        self.newSnapshot = False
 
     def handle_incrementalSnapshot(self, event):
         print("Handling IncrementalSnapshot Event...")
@@ -327,7 +349,9 @@ class EventReader:
             position_y = position['y']
             position_id = position['id']
             element = self.getElementById(position_id)
-            if element is None:
+            if element is None and self.newSnapshot is True:
+                self.rebuild_snapshot()
+                element = self.getElementById(position_id)
                 print("No element is found, ignore mouse move")
                 continue
             print("Element found:")
@@ -349,8 +373,10 @@ class EventReader:
         interactionType = data['type']
         position_id = data['id']
         element = self.getElementById(position_id)
-        if element is None:
-            print("No element is found, ignore mouse move")
+        if element is None and self.newSnapshot is True:
+            self.rebuild_snapshot()
+            element = self.getElementById(position_id)
+            print("No element is found, ignore mouse interaction")
             return
         original_style = element.get_attribute('style')
         self.apply_style(element, "border: 3px solid red;")
@@ -476,12 +502,15 @@ class EventReader:
 
     def getElementById(self, currId):
         print("The information of the element trying to find:")
+        if currId not in self.element_dict:
+            warnings.warn("Can not find element in the dictionary")
+            return None
         element_info = self.element_dict[currId]
         print(element_info)
         while 'tagName' not in element_info:
             if 'parentId' not in element_info:
                 warnings.warn("Can not locate this element")
-                return []
+                return None
             element_info = self.element_dict[element_info['parentId']]
             print("Getting parent node of text node:")
             print(element_info)
@@ -499,5 +528,7 @@ class EventReader:
         return elements_found_rrwebId[0]
 
 
-eventReadInstance = EventReader('../rrweb-replayer-nodejs/results/')
+user_session_to_replay = 2
+eventReadInstance = EventReader('../rrweb-replayer-nodejs/results/user_session' + str(user_session_to_replay) + '/',
+                                user_session_to_replay)
 eventReadInstance.main()
