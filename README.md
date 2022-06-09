@@ -1,5 +1,6 @@
 # rrweb-replayer-selenium
-## Language Version
+## Working Environment
+- Ubuntu 20.04 LTS
 - Python 3.8.10
 - node v14.19.1
 - Chrome Version 102.0.5005.61 (Official Build) (64-bit)
