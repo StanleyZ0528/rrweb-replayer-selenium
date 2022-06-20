@@ -8,6 +8,11 @@ rrweb_snapshot_js.setAttribute('src',
     'https://cdn.jsdelivr.net/gh/StanleyZ0528/rrweb-replayer-selenium@0.2.0/rrweb-replayer-nodejs/scripts/rrweb_snapshot_custom.js');
 document.head.appendChild(rrweb_snapshot_js);
 
+const reanimator_js = document.createElement('script');
+reanimator_js.setAttribute('src',
+    'https://cdn.jsdelivr.net/gh/lawnsea/WaterfallEngineering/reanimator/dist/reanimator.js')
+document.head.appendChild(reanimator_js);
+
 let events = [];
 let entire_events = [];
 let interactions = [];
@@ -16,6 +21,9 @@ let user_session = -1;
 let page_count = -1;
 let server_on = false;
 let first_load = true;
+let lastSnapshot = {};
+let snapshotCount = 0;
+let checkSnapshot = false;
 
 function takeSnapshot() {
     if (typeof rrwebSnapshot !== "undefined") {
@@ -25,8 +33,6 @@ function takeSnapshot() {
         fetch("http://localhost:8000", {
             method: 'PUT',
             body: content,
-        }).then((response) => {
-            console.log(response)
         });
     } else {
         setTimeout(takeSnapshot, 250);
@@ -43,17 +49,30 @@ function startRecord() {
                     let time = Date.now();
                     if (time - lastTimestamp > 1000) {
                         const [snap] = rrwebSnapshot.snapshot(document);
-                        event.data['snap'] = snap;
+                        lastSnapshot = snap;
+                        event['snap'] = snapshotCount;
                         if (entire_events[entire_events.length - 1].type === 3 &&
                             entire_events[entire_events.length - 1].data.source === 0) {
                             entire_events.pop();
                         }
+                        checkSnapshot = true;
                         events.push(event);
                         entire_events.push(event);
                         interactions.push(event.data.type);
                         lastTimestamp = time;
                     }
                 } else {
+                    if (checkSnapshot) {
+                        const snapshotContent = JSON.stringify({'lastSnapshot': lastSnapshot,
+                            'user_session': user_session, 'page_count': page_count, 'snapshotCount': snapshotCount});
+                        fetch("http://localhost:8000", {
+                            method: 'PUT',
+                            body: snapshotContent
+                        });
+                        snapshotCount += 1;
+                        console.log("Mutation as snapshot sent: " + snapshotCount.toString());
+                    }
+                    checkSnapshot = false;
                     events.push(event);
                     entire_events.push(event);
                     interactions.push(event.data.type);
@@ -105,11 +124,10 @@ function waitForConnection() {
                     fetch("http://localhost:8000", {
                         method: 'PUT',
                         body: eventContent
-                    }).then((response) => {
-                        console.log(response);
                     });
+                    console.log("Entire events sent");
                     const time = Date.now();
-                    while ((Date.now() - time) < 5000) {
+                    while ((Date.now() - time) < 2000) {
                     }
                     return true;
                 });
@@ -152,4 +170,17 @@ window.addEventListener('keydown', function(e){
         console.log("Toggle Session status finished");
     }
 }, false);
+
+/*function waitForReanimator() {
+    if (typeof Reanimator !== "undefined") {
+        console.log("Reanimator discovered...");
+        setTimeout(function () {
+            Reanimator.capture();
+        }, 0);
+    } else {
+        setTimeout(waitForReanimator, 250);
+    }
+}*/
+
 waitForConnection();
+// waitForReanimator();

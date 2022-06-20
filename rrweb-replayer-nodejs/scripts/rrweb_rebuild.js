@@ -3,7 +3,13 @@ function rebuildSnapshot(filename) {
     .then(response => {return response.json();})
     .then(data => {
         console.log(data['snap']);
-        const snapshot = rrwebSnapshot.rebuild(data['snap'], { doc: document })[0];
+        let snap = {};
+        if ('snap' in data) {
+            snap = data['snap'];
+        } else if ('lastSnapshot' in data) {
+            snap = data['lastSnapshot'];
+        }
+        const snapshot = rrwebSnapshot.rebuild(snap, { doc: document })[0];
         const rrweb_record_js = document.createElement('script');
         rrweb_record_js.setAttribute('src',
             'https://cdn.jsdelivr.net/npm/rrweb@1.1.3/dist/rrweb.min.js');

@@ -53,7 +53,6 @@ class EventReader:
         while True:
             # Load the path for the set of recorded events
             recordPath = self.path + "record" + str(self.currentPage) + ".json"
-            self.currentPage += 1
             print(recordPath)
             if not exists(recordPath):
                 break
@@ -91,6 +90,8 @@ class EventReader:
             # A dictionary that maps rrweb_id to element node
             self.element_dict = {}
             print("Page" + str(self.currentPage) + " finished")
+            self.mutationCounter = 0
+            self.currentPage += 1
             time.sleep(1)
         time.sleep(5)
         self.driver.close()
@@ -123,7 +124,7 @@ class EventReader:
 
     def handle_snapshot(self, event):
         print("Handling Snapshot Event...")
-        snapshotPath = "results/user_session" + str(self.user_session) + "/snapshot" + str(self.currentSnapshot)\
+        snapshotPath = "results/user_session" + str(self.user_session) + "/snapshot" + str(self.currentSnapshot) \
                        + ".json"
         print(snapshotPath)
         snapshotFilePath = self.path + "snapshot" + str(self.currentSnapshot) + ".json"
@@ -140,19 +141,30 @@ class EventReader:
 
     def handle_mutation_as_snapshot(self, data):
         print("Handling Mutation Event as Snapshot")
-        self.lastSnap = data['snap']
-        snapshot = {"snap": self.lastSnap}
-        with open(self.writePath, 'w') as f:
-            json.dump(snapshot, f, ensure_ascii=False)
-        self.newSnapshot = False
-        snapshotPath = "results/user_session" + str(self.user_session) + "/snapshot.json"
+        # self.lastSnap = data['snap']
+        # snapshot = {"snap": self.lastSnap}
+        # with open(self.writePath, 'w') as f:
+        #     json.dump(snapshot, f, ensure_ascii=False)
+        # self.newSnapshot = False
+        snapshotPath = "results/user_session" + str(self.user_session) + "/lastSnapshot" + str(self.currentPage) + \
+                       "_" + str(self.mutationCounter) + ".json"
+        print(snapshotPath)
         self.driver.execute_script("rebuildSnapshot('" + snapshotPath + "');")
         # Check if mutation event changes the previous snapshot
+        snapshotFilePath = self.path + "lastSnapshot" + str(self.currentPage) + "_" + str(self.mutationCounter) + ".json"
+        print(snapshotFilePath)
+        with open(snapshotFilePath, 'r') as f:
+            fileData = json.load(f)
+        pairs = fileData.items()
+        self.element_dict = {}
+        for key, events in pairs:
+            self.loadDict_recursive(events)
+            break
         newSource = self.driver.page_source
         if newSource != self.lastSource:
             print("Mutation occurs: " + str(self.mutationCounter))
-            self.element_dict = {}
-            self.loadDict_recursive(self.lastSnap)
+            # self.element_dict = {}
+            # self.loadDict_recursive(self.lastSnap)
         else:
             warnings.warn("No mutation from snapshot:" + str(self.mutationCounter))
         self.mutationCounter += 1
@@ -354,13 +366,16 @@ class EventReader:
                 element = self.getElementById(position_id)
                 print("No element is found, ignore mouse move")
                 continue
+            if element is None:
+                warnings.warn("No element is found, ignore mouse move")
+                continue
             print("Element found:")
             print(element)
-            original_style = element.get_attribute('style')
-            # Highlight the element that the mouse is currently hovering above
-            self.apply_style(element, "border: 3px solid red;")
-            time.sleep(.2)
-            self.apply_style(element, original_style)
+            # original_style = element.get_attribute('style')
+            # # Highlight the element that the mouse is currently hovering above
+            # self.apply_style(element, "border: 3px solid red;")
+            # time.sleep(.2)
+            # self.apply_style(element, original_style)
             try:
                 self.action.move_to_element(element).perform()
             except:
@@ -369,7 +384,7 @@ class EventReader:
 
     def mouseInteraction_handler(self, data):
         print("Incremental Snapshot: Handling Mouse Interaction")
-        return
+        print(data)
         interactionType = data['type']
         position_id = data['id']
         element = self.getElementById(position_id)
@@ -378,10 +393,14 @@ class EventReader:
             element = self.getElementById(position_id)
             print("No element is found, ignore mouse interaction")
             return
+        if element is None:
+            print("No element is found, ignore mouse interaction")
+            return
         original_style = element.get_attribute('style')
         self.apply_style(element, "border: 3px solid red;")
         time.sleep(.2)
         self.apply_style(element, original_style)
+        return
         if interactionType == 0:  # Mouse Up
             print("Mouse Up")
             self.action.move_to_element(element)
@@ -528,7 +547,7 @@ class EventReader:
         return elements_found_rrwebId[0]
 
 
-user_session_to_replay = 2
+user_session_to_replay = 1
 eventReadInstance = EventReader('../rrweb-replayer-nodejs/results/user_session' + str(user_session_to_replay) + '/',
                                 user_session_to_replay)
 eventReadInstance.main()
