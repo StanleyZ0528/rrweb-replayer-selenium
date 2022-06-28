@@ -36,7 +36,8 @@ app.post('/', (req, res) => {
         if (s === "Server Status") {
             res.writeHead(200, {'Content-Type': 'text/plain'});
             if (global.sessionStart) {
-                res.write("Server On: Session " + global.sessionCount.toString());
+                res.write("Server On: Session-" + global.sessionCount.toString() + "-"
+                    + global.pageCounter.toString());
                 res.end();
                 global.pageCounter += 1;
                 console.log('Session already started...');
@@ -118,6 +119,14 @@ app.put('/', (req, res) => {
                 fs.mkdirSync(dir);
             }
             const path = dir + `/lastSnapshot${page_count}_${snapshotCount}.json`;
+            fs.writeFile(path, s, (err) => {
+                // In case of an error throw err.
+                if (err) throw err;
+            });
+        } else if (s.startsWith('{"nondeterminism":')){
+            const fs = require('fs');
+            const dir = `results/user_session${user_session}`;
+            const path = dir + `/nondeterminism${page_count}.json`;
             fs.writeFile(path, s, (err) => {
                 // In case of an error throw err.
                 if (err) throw err;
