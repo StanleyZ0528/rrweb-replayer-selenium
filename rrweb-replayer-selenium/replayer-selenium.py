@@ -124,7 +124,7 @@ class EventReader:
 
     def handle_snapshot(self, event):
         print("Handling Snapshot Event...")
-        snapshotPath = "results/user_session" + str(self.user_session) + "/snapshot" + str(self.currentSnapshot) \
+        snapshotPath = "results/user_session" + str(self.user_session) + "/snapshot" + str(self.currentSnapshot)\
                        + ".json"
         print(snapshotPath)
         snapshotFilePath = self.path + "snapshot" + str(self.currentSnapshot) + ".json"
@@ -554,7 +554,7 @@ class EventReader:
         return elements_found_rrwebId[0]
 
 
-user_session_to_replay = 1
+user_session_to_replay = 2
 eventReadInstance = EventReader('../rrweb-replayer-nodejs/results/user_session' + str(user_session_to_replay) + '/',
                                 user_session_to_replay)
 eventReadInstance.main()
