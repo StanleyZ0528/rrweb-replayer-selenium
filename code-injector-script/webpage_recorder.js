@@ -1,17 +1,23 @@
 const rrweb_record_js = document.createElement('script');
 rrweb_record_js.setAttribute('src',
-    'https://cdn.jsdelivr.net/npm/rrweb@1.1.3/dist/record/rrweb-record.js');
+    'https://cdn.jsdelivr.net/gh/StanleyZ0528/rrweb-replayer-selenium@0.3.0/rrweb-scripts/rrweb_record.js');
 document.head.appendChild(rrweb_record_js);
 
 const rrweb_snapshot_js = document.createElement('script');
 rrweb_snapshot_js.setAttribute('src',
-    'https://cdn.jsdelivr.net/gh/StanleyZ0528/rrweb-replayer-selenium@0.2.0/rrweb-replayer-nodejs/scripts/rrweb_snapshot_custom.js');
+    'https://cdn.jsdelivr.net/gh/StanleyZ0528/rrweb-replayer-selenium@0.3.0/rrweb-scripts/rrweb_snapshot.js');
 document.head.appendChild(rrweb_snapshot_js);
 
-const reanimator_js = document.createElement('script');
-reanimator_js.setAttribute('src',
-    'https://cdn.jsdelivr.net/gh/lawnsea/WaterfallEngineering/reanimator/dist/reanimator.js')
-document.head.appendChild(reanimator_js);
+const record_button = document.createElement('div');
+record_button.style.position = 'absolute';
+record_button.style.backgroundColor = 'red';
+record_button.style.width = '100px';
+record_button.style.height = '100px';
+record_button.style.left = '5px';
+record_button.style.top = '5px';
+record_button.style.zIndex = 1000;
+record_button.
+document.body.appendChild(record_button);
 
 let events = [];
 let entire_events = [];
@@ -24,6 +30,7 @@ let first_load = true;
 let lastSnapshot = {};
 let snapshotCount = 0;
 let checkSnapshot = false;
+let metaData = {};
 
 let _native = {};
 let _log = {};
@@ -58,7 +65,7 @@ function startRecord() {
                     event.data.source === 0 ||
                     event.type === 2) {
                     let time = Date.now();
-                    if (time - lastTimestamp > 1000) {
+                    if (time - lastTimestamp > 500) {
                         const [snap] = rrwebSnapshot.snapshot(document);
                         lastSnapshot = snap;
                         event['snap'] = snapshotCount;
@@ -120,6 +127,8 @@ function waitForConnection() {
                 server_on = true;
                 console.log(user_session);
                 console.log(page_count);
+                // Set initial metadata for the webpage
+                setInitialMetaData();
                 // Take a snapshot of the initial page
                 takeSnapshot();
                 // Start rrweb recording
@@ -130,23 +139,9 @@ function waitForConnection() {
                         return true;
                     }
                     server_on = false;
-                    const nondeterminism = JSON.stringify({'nondeterminism': _log,
-                        'user_session': user_session, 'page_count': page_count});
-                    const eventContent = JSON.stringify({'entire_events': entire_events,
-                        'user_session': user_session, 'page_count': page_count});
-                    // console.log(eventContent)
-                    fetch("http://localhost:8000", {
-                        method: 'PUT',
-                        body: nondeterminism
-                    });
-                    // console.log(eventContent)
-                    fetch("http://localhost:8000", {
-                        method: 'PUT',
-                        body: eventContent
-                    });
-                    console.log("Entire events sent");
+                    sendFinalData();
                     const time = Date.now();
-                    while ((Date.now() - time) < 2000) {
+                    while ((Date.now() - time) < 1000) {
                     }
                     return true;
                 });
@@ -173,22 +168,7 @@ window.addEventListener('keydown', function(e){
         .then(function(text) {
             console.log(text);
             if (text === "Server Off") {
-                const nondeterminism = JSON.stringify({'nondeterminism': _log,
-                    'user_session': user_session, 'page_count': page_count});
-                // console.log(eventContent)
-                fetch("http://localhost:8000", {
-                    method: 'PUT',
-                    body: nondeterminism
-                });
-                const eventContent = JSON.stringify({'entire_events': entire_events, 'user_session': user_session,
-                    'page_count': page_count});
-                // console.log(eventContent)
-                fetch("http://localhost:8000", {
-                    method: 'PUT',
-                    body: eventContent
-                }).then((response) => {
-                    console.log(response);
-                });
+                sendFinalData();
                 server_on = false;
                 alert("Finish Recording, wait a few seconds before you can leave the page")
             }
@@ -196,6 +176,37 @@ window.addEventListener('keydown', function(e){
         console.log("Toggle Session status finished");
     }
 }, false);
+
+function sendFinalData() {
+    setFinalMetaData();
+    const nondeterminism = JSON.stringify({'nondeterminism': _log,
+        'user_session': user_session, 'page_count': page_count});
+    const eventContent = JSON.stringify({'entire_events': entire_events,
+        'user_session': user_session, 'page_count': page_count});
+    const finalMetaData = JSON.stringify({'metaData': metaData,
+        'user_session': user_session, 'page_count': page_count})
+    // console.log(eventContent)
+    fetch("http://localhost:8000", {
+        method: 'PUT',
+        body: nondeterminism
+    }).then((response) => {
+        console.log(response);
+    });
+    // console.log(eventContent)
+    fetch("http://localhost:8000", {
+        method: 'PUT',
+        body: eventContent
+    }).then((response) => {
+        console.log(response);
+    });
+    fetch("http://localhost:8000", {
+        method: 'PUT',
+        body: finalMetaData
+    }).then((response) => {
+        console.log(response);
+    });
+    console.log("Entire events sent");
+}
 
 function _Date(replaying, year, month, day, hours, minutes, seconds, ms) {
     const argsLen = arguments.length;
@@ -335,6 +346,36 @@ localStorage.__proto__.getItem = function(key) {
         val: val
     })
     return val;
+}
+
+function setInitialMetaData() {
+    metaData['url'] = window.location;
+    metaData['userAgent'] = navigator.userAgent;
+    metaData['initialTime'] = Date.now();
+    metaData['title'] = document.title;
+    metaData['initialWidth'] = (window.innerWidth ||
+        (document.documentElement && document.documentElement.clientWidth) ||
+        (document.body && document.body.clientWidth));
+    metaData['initialHeight'] = (window.innerHeight ||
+        (document.documentElement && document.documentElement.clientHeight) ||
+        (document.body && document.body.clientHeight));
+    metaData['initialLocalStorage'] = window.localStorage;
+    metaData['initialCookie'] = document.cookie;
+    metaData['userID'] = sessionStorage.getItem('SessionName');
+    console.log(metaData);
+}
+
+function setFinalMetaData() {
+    metaData['finalTime'] = Date.now();
+    metaData['finalWidth'] = (window.innerWidth ||
+        (document.documentElement && document.documentElement.clientWidth) ||
+        (document.body && document.body.clientWidth));
+    metaData['finalHeight'] = (window.innerHeight ||
+        (document.documentElement && document.documentElement.clientHeight) ||
+        (document.body && document.body.clientHeight));
+    metaData['finalLocalStorage'] = window.localStorage;
+    metaData['finalCookie'] = document.cookie;
+    console.log(metaData);
 }
 
 capture_setInterval.id = 0;

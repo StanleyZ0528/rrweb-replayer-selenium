@@ -153,8 +153,12 @@ class EventReader:
         # Check if mutation event changes the previous snapshot
         snapshotFilePath = self.path + "lastSnapshot" + str(self.currentPage) + "_" + str(self.mutationCounter) + ".json"
         print(snapshotFilePath)
-        with open(snapshotFilePath, 'r') as f:
-            fileData = json.load(f)
+        try:
+            with open(snapshotFilePath, 'r') as f:
+                fileData = json.load(f)
+        except:
+            print("Mutation as snapshot file not found")
+            return
         pairs = fileData.items()
         self.element_dict = {}
         for key, events in pairs:
@@ -396,10 +400,13 @@ class EventReader:
         if element is None:
             print("No element is found, ignore mouse interaction")
             return
-        original_style = element.get_attribute('style')
-        self.apply_style(element, "border: 3px solid red;")
-        time.sleep(.2)
-        self.apply_style(element, original_style)
+        try:
+            original_style = element.get_attribute('style')
+            self.apply_style(element, "border: 3px solid red;")
+            time.sleep(.2)
+            self.apply_style(element, original_style)
+        except:
+            print("Can't apply style to this element")
         return
         if interactionType == 0:  # Mouse Up
             print("Mouse Up")

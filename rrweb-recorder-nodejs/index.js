@@ -113,6 +113,9 @@ app.put('/', (req, res) => {
         } else if (s.startsWith('{"lastSnapshot":')) {
             const fs = require('fs');
             const dir = `results/user_session${user_session}`;
+            if (!fs.existsSync(dir)){
+                fs.mkdirSync(dir);
+            }
             const snapshotCount = object['snapshotCount'];
             console.log(snapshotCount);
             if (!fs.existsSync(dir)){
@@ -126,7 +129,21 @@ app.put('/', (req, res) => {
         } else if (s.startsWith('{"nondeterminism":')){
             const fs = require('fs');
             const dir = `results/user_session${user_session}`;
+            if (!fs.existsSync(dir)){
+                fs.mkdirSync(dir);
+            }
             const path = dir + `/nondeterminism${page_count}.json`;
+            fs.writeFile(path, s, (err) => {
+                // In case of an error throw err.
+                if (err) throw err;
+            });
+        } else if (s.startsWith('{"metaData":')){
+            const fs = require('fs');
+            const dir = `results/user_session${user_session}`;
+            if (!fs.existsSync(dir)){
+                fs.mkdirSync(dir);
+            }
+            const path = dir + `/metaData${page_count}.json`;
             fs.writeFile(path, s, (err) => {
                 // In case of an error throw err.
                 if (err) throw err;
