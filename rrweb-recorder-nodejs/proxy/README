@@ -1,0 +1,5 @@
+./start_proxy_server.sh starts the proxy and defaults to port 1234
+
+./start_chrome.sh starts chrome and sets its proxy server to port 1234
+
+All network requests will be saved (and overwriteen) to recordings/har.out as shown in start_proxy_server.sh. 
