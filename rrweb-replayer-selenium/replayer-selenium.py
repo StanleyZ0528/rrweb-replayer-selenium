@@ -265,7 +265,8 @@ class EventReader:
 		width = data['width']
 		height = data['height']
 		# self.driver.get(href)
-		self.driver.get("http://localhost:5000")
+		# self.driver.get("file://%s" % os.path.abspath(os.path.join(os.path.dirname(__file__), "../rrweb-replayer-nodejs/index.html")))
+		self.driver.get('http://localhost:5000')
 		self.driver.set_window_size(width, height)
 		time.sleep(.5)
 
@@ -575,6 +576,7 @@ class EventReader:
 		# CssSelector text that is going to be used
 		cssSelectorText = element_info['tagName'] + '[rrweb_id="' + str(element_info['id']) + '"]'
 		print(cssSelectorText)
+		# code.interact('finding element', local=dict(locals(), **globals()))
 		elements_found_rrwebId = self.driver.find_elements(By.CSS_SELECTOR, cssSelectorText)
 		if len(elements_found_rrwebId) == 0:
 			warnings.warn("No Element is found")
