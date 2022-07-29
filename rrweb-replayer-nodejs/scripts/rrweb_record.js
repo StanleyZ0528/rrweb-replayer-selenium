@@ -603,9 +603,9 @@ var rrwebRecord = (function () {
                     }
                     textContent = absoluteToStylesheet(textContent, getHref());
                 }
-                if (isScript) {
-                    textContent = 'SCRIPT_PLACEHOLDER';
-                }
+                // if (isScript) {
+                //     textContent = 'SCRIPT_PLACEHOLDER';
+                // }
                 if (!isStyle &&
                     !isScript &&
                     needMaskingText(n, maskTextClass, maskTextSelector) &&
