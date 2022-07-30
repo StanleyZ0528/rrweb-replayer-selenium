@@ -12,7 +12,7 @@ function rebuildSnapshot(filename) {
         const snapshot = rrwebSnapshot.rebuild(snap, { doc: document })[0];
         const rrweb_record_js = document.createElement('script');
         rrweb_record_js.setAttribute('src',
-            'https://cdn.jsdelivr.net/gh/StanleyZ0528/rrweb-replayer-selenium@0.3.0/rrweb-scripts/rrweb.min.js');
+            'scripts/rrweb.min.js');
         document.head.appendChild(rrweb_record_js);
     })
     .catch(error => console.log('Error: ', error));

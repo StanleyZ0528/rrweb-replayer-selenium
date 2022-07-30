@@ -10,4 +10,7 @@
 *.class
 
 # bash scripts
-*.sh
+# *.sh
+
+recordings
+node_modules
