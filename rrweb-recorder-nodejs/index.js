@@ -21,6 +21,17 @@ app.get('/', (req, res) => {
             res.end(err);
             return;
         });
+    const { exec } = require('child_process');
+    exec('vncserver :2', (err, stdout, stderr) => {
+        if (err) {
+            //some err occurred
+            console.error(err)
+        } else {
+            // the *entire* stdout and stderr (buffered)
+            console.log(`stdout: ${stdout}`);
+            console.log(`stderr: ${stderr}`);
+        }
+    });
 })
 
 app.post('/', (req, res) => {

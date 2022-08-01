@@ -1,0 +1,15 @@
+{
+  "name": "vncserver-starter",
+  "version": "1.0.0",
+  "description": "An intermediate webpage used to start our vncserver with default webpage opened in chrome and redirect to novnc",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Stanley",
+  "license": "ISC",
+  "dependencies": {
+    "ejs": "^3.1.8",
+    "express": "^4.18.1"
+  }
+}
