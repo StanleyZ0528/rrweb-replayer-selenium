@@ -4,6 +4,7 @@ import time
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+import trio
 import warnings
 import os
 from os.path import exists
@@ -19,14 +20,11 @@ def runServer():
 	# print("To start %s " % str(["node", os.path.join(pathlib.Path(__file__).parent.resolve(), '../rrweb-replayer-nodejs/index.js')]))
 	return subprocess.Popen(["node", os.path.join(pathlib.Path(__file__).parent.resolve(), '../rrweb-replayer-nodejs/index.js')])
 	
-
-
 class EventReader:
 	def __init__(self, path, user_session):
 		# Use subprocess to start a localhost webpage for replay
 		self.server = runServer()
 		print("Server[%d] " % (self.server.pid))
-		# code.interact(local=dict(locals(), **globals()))
 	   
 		# Path to rrweb recording result
 		self.path = path
@@ -65,11 +63,10 @@ class EventReader:
 			driver_path = r'/home/ss/bin/chromedriver'
 			options.binary_location = binary_path
 			self.driver = webdriver.Chrome(driver_path, options=options)
-			
 		else:
 			self.driver = webdriver.Chrome(options=options)
 
-	def main(self, driver=None):
+	async def main(self, driver=None):
 		if driver is None:
 			self.init_browser()
 		else:
@@ -97,9 +94,9 @@ class EventReader:
 					elif eventType == 1:  # Load
 						self.handle_load(event)
 					elif eventType == 2:  # FullSnapshot
-						self.handle_snapshot(event)
+						await self.handle_snapshot(event)
 					elif eventType == 3:  # IncrementalSnapshot
-						self.handle_incrementalSnapshot(event)
+						await self.handle_incrementalSnapshot(event)
 						timestamp = event['timestamp']
 						# if self.lastTimestamp != -1:
 						#     time.sleep((timestamp - self.lastTimestamp) / 1000)
@@ -151,8 +148,17 @@ class EventReader:
 			if 'tagName' not in node_copy and 'textContent' in node_copy:
 				self.element_dict[node_copy['id']]['parentId'] = currNode['id']
 		return
+	
+	async def execute_script(self, script):
+		"""
+		RebuildSnapshot disconnects webdriver sometimes, explore if the samething happens using cdp (chromium debug port)
+		"""
+		if 'cdp_session' in dir(self.driver):
+			await self.driver.cdp_execute_script(self.driver, script)
+		else:
+			self.driver.execute_script(script)
 
-	def handle_snapshot(self, event):
+	async def handle_snapshot(self, event):
 		print("Handling Snapshot Event...")
 		snapshotPath = "results/user_session" + str(self.user_session) + "/snapshot" + str(self.currentSnapshot)\
                        + ".json"		
@@ -165,23 +171,24 @@ class EventReader:
 		self.element_dict = {}
 		for key, events in pairs:
 			self.loadDict_recursive(events)
-		self.driver.execute_script("rebuildSnapshot('" + snapshotPath + "');")
+		
+		await self.execute_script("rebuildSnapshot('" + snapshotPath + "');")
 		# self.driver.execute_script("ForbidRedirect();")
 		time.sleep(.5)
 
-	def handle_mutation_as_snapshot(self, data):
+	async def handle_mutation_as_snapshot(self, data):
 		print("Handling Mutation Event as Snapshot")
 		# self.lastSnap = data['snap']
 		# snapshot = {"snap": self.lastSnap}
 		# with open(self.writePath, 'w') as f:
 		#     json.dump(snapshot, f, ensure_ascii=False)
 		# self.newSnapshot = False
-		# snapshotPath = "results/user_session" + str(self.user_session) + "/lastSnapshot" + str(self.currentPage) + \
-		#                "_" + str(self.mutationCounter) + ".json"
-		snapshotPath = os.path.join(self.path, "lastSnapshot" + str(self.currentPage) + "_" + str(self.mutationCounter) + ".json")
+		snapshotPath = "results/user_session" + str(self.user_session) + "/lastSnapshot" + str(self.currentPage) + \
+		               "_" + str(self.mutationCounter) + ".json"
+		# snapshotPath = os.path.join(self.path, "lastSnapshot" + str(self.currentPage) + "_" + str(self.mutationCounter) + ".json")
 
-		print(snapshotPath)
-		self.driver.execute_script("rebuildSnapshot('" + snapshotPath + "');")
+		print("Rebuilding: %s" % snapshotPath)
+		await self.execute_script("rebuildSnapshot('" + snapshotPath + "');")
 		# Check if mutation event changes the previous snapshot
 		snapshotFilePath = os.path.join(self.path, "lastSnapshot" + str(self.currentPage) + "_" + str(self.mutationCounter) + ".json")
 		print(snapshotFilePath)
@@ -206,9 +213,12 @@ class EventReader:
 		self.mutationCounter += 1
 		self.lastSource = newSource
 
-	def rebuild_snapshot(self):
-		snapshotPath = os.path.join(self.path, "snapshot.json")
-		self.driver.execute_script("rebuildSnapshot('" + snapshotPath + "');")
+	async def rebuild_snapshot(self):
+		# snapshotPath = os.path.join(self.path, "snapshot.json")
+		snapshotPath = "results/user_session" + str(self.user_session) + "/snapshot" + str(self.currentSnapshot)\
+				+ ".json"		
+		print("Rebuilding: %s" % snapshotPath)
+		await self.execute_script("rebuildSnapshot('" + snapshotPath + "');")
 		# Check if mutation event changes the previous snapshot
 		newSource = self.driver.page_source
 		if newSource != self.lastSource:
@@ -221,15 +231,16 @@ class EventReader:
 		self.lastSource = newSource
 		self.newSnapshot = False
 
-	def handle_incrementalSnapshot(self, event):
+	async def handle_incrementalSnapshot(self, event):
 		print("Handling IncrementalSnapshot Event...")
 		data = event['data']
 		timestamp = event['timestamp']
 		source = data['source']
 		if source == 0:  # Mutation
-			self.handle_mutation_as_snapshot(data)
+			await self.handle_mutation_as_snapshot(data)
 		elif source == 1:  # MouseMove
-			self.mouseMove_handler(data)
+			await self.mouseMove_handler(data)
+			# pass
 		elif source == 2:  # MouseInteraction
 			self.mouseInteraction_handler(data)
 		elif source == 3:  # Scroll
@@ -267,7 +278,7 @@ class EventReader:
 		# self.driver.get(href)
 		# self.driver.get("file://%s" % os.path.abspath(os.path.join(os.path.dirname(__file__), "../rrweb-replayer-nodejs/index.html")))
 		self.driver.get('http://localhost:5000')
-		self.driver.set_window_size(width, height)
+		# self.driver.set_window_size(width, height)
 		time.sleep(.5)
 
 	# def addNode_recursive(self, currNode, parentId):
@@ -390,7 +401,7 @@ class EventReader:
 	def apply_style(self, element, s):
 		self.driver.execute_script("arguments[0].setAttribute('style', arguments[1]);", element, s)
 
-	def mouseMove_handler(self, data):
+	async def mouseMove_handler(self, data):
 		print("Incremental Snapshot: Handling Mouse Move")
 		positions = data['positions']
 		for position in [positions[0], positions[-1]]:
@@ -399,7 +410,7 @@ class EventReader:
 			position_id = position['id']
 			element = self.getElementById(position_id)
 			if element is None and self.newSnapshot is True:
-				self.rebuild_snapshot()
+				await self.rebuild_snapshot()
 				element = self.getElementById(position_id)
 				print("No element is found, ignore mouse move")
 				continue
@@ -413,9 +424,14 @@ class EventReader:
 			# self.apply_style(element, "border: 3px solid red;")
 			# time.sleep(.2)
 			# self.apply_style(element, original_style)
-			try:
-				self.action.move_to_element(element).perform()
-			except:
+			found = False
+			with trio.move_on_after(5):
+				try:
+					self.action.move_to_element(element).perform()
+					found = True
+				except:
+					pass
+			if not found:
 				print("Can't move to this element")
 		return
 
@@ -433,13 +449,14 @@ class EventReader:
 		if element is None:
 			print("No element is found, ignore mouse interaction")
 			return
-		try:
-			original_style = element.get_attribute('style')
-			self.apply_style(element, "border: 3px solid red;")
-			time.sleep(.2)
-			self.apply_style(element, original_style)
-		except:
-			print("Can't apply style to this element")
+		# try:
+		# 	# original_style = element.get_attribute('style')
+		# 	# self.apply_style(element, "border: 3px solid red;")
+		# 	# time.sleep(.2)
+		# 	# self.apply_style(element, original_style)
+		# except:
+		# 	print("Can't apply style to this element")
+		
 		return
 		if interactionType == 0:  # Mouse Up
 			print("Mouse Up")
@@ -576,7 +593,6 @@ class EventReader:
 		# CssSelector text that is going to be used
 		cssSelectorText = element_info['tagName'] + '[rrweb_id="' + str(element_info['id']) + '"]'
 		print(cssSelectorText)
-		# code.interact('finding element', local=dict(locals(), **globals()))
 		elements_found_rrwebId = self.driver.find_elements(By.CSS_SELECTOR, cssSelectorText)
 		if len(elements_found_rrwebId) == 0:
 			warnings.warn("No Element is found")
@@ -592,4 +608,4 @@ if __name__ == '__main__':
 	user_session_to_replay = 2
 	eventReadInstance = EventReader('../rrweb-replayer-nodejs/results/user_session' + str(user_session_to_replay) + '/',
 									user_session_to_replay)
-	eventReadInstance.main()
+	trio.run(eventReadInstance.main)
