@@ -1,11 +1,11 @@
 const rrweb_record_js = document.createElement('script');
 rrweb_record_js.setAttribute('src',
-    'https://cdn.jsdelivr.net/gh/StanleyZ0528/rrweb-replayer-selenium@0.3.0/rrweb-scripts/rrweb_record.js');
+    'https://cdn.jsdelivr.net/gh/StanleyZ0528/rrweb-replayer-selenium@latest/rrweb-scripts/rrweb_record.js');
 document.head.appendChild(rrweb_record_js);
 
 const rrweb_snapshot_js = document.createElement('script');
 rrweb_snapshot_js.setAttribute('src',
-    'https://cdn.jsdelivr.net/gh/StanleyZ0528/rrweb-replayer-selenium@0.3.0/rrweb-scripts/rrweb_snapshot.js');
+    'https://cdn.jsdelivr.net/gh/StanleyZ0528/rrweb-replayer-selenium@latest/rrweb-scripts/rrweb_snapshot.js');
 document.head.appendChild(rrweb_snapshot_js);
 
 const record_button = document.createElement('div');
