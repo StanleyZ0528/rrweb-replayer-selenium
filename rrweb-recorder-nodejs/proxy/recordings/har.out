@@ -1,0 +1,11 @@
+{
+  "log": {
+    "version": "1.2",
+    "creator": {
+      "name": "mitmproxy har_dump",
+      "version": "0.1",
+      "comment": "mitmproxy version mitmproxy 8.1.1"
+    },
+    "entries": []
+  }
+}

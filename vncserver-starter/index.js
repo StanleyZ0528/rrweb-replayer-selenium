@@ -2,7 +2,6 @@ const express = require('express');
 const app = express();
 const port = 8010;
 const fs = require('fs');
-const {exec} = require("child_process");
 const fs_promise = require('fs').promises;
 
 app.set('view engine', 'html');
@@ -14,18 +13,12 @@ app.get('/webpage/:webpage', (req, res) => {
         if (display > 10) return;
         const bash_script = '~/.vnc/run.sh ' + display.toString() + ' ~/.vnc/xstartup_' + webpageName;
         console.log(bash_script);
-        exec('~/.vnc/run.sh ' + display.toString() + ' ~/.vnc/xstartup_' + webpageName,
-            (err, stdout, stderr) => {
-                if (err) {
-                    //some err occurred
-                    console.error(err)
-                    // display = tryPort(display+1, name);
-                } else {
-                    // the *entire* stdout and stderr (buffered)
-                    console.log(`stdout: ${stdout}`);
-                    console.log(`stderr: ${stderr}`);
-                }
-            });
+	try {
+            const {execSync} = require("child_process");
+            const stdout = execSync(bash_script);
+	} catch {
+	    return tryPort(display+1, webpageName);
+	}
         return display;
     }
     const webpageName = req.params.webpage;
