@@ -59,6 +59,8 @@ class ReplayProxy():
 		for entry in entries:
 			url = entry["request"]["url"]
 			response = entry["response"]
+			if 'cdn.jsdelivr.net/gh/StanleyZ0528/rrweb-replayer-selenium' in url:
+				continue
 			self.dict_url_response[url] = response
 		
 
