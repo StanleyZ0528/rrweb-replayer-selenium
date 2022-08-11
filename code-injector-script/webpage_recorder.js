@@ -8,17 +8,6 @@ rrweb_snapshot_js.setAttribute('src',
     'https://cdn.jsdelivr.net/gh/StanleyZ0528/rrweb-replayer-selenium@latest/rrweb-scripts/rrweb_snapshot.js');
 document.head.appendChild(rrweb_snapshot_js);
 
-const record_button = document.createElement('div');
-record_button.style.position = 'absolute';
-record_button.style.backgroundColor = 'red';
-record_button.style.width = '100px';
-record_button.style.height = '100px';
-record_button.style.left = '5px';
-record_button.style.top = '5px';
-record_button.style.zIndex = 1000;
-record_button.
-document.body.appendChild(record_button);
-
 let events = [];
 let entire_events = [];
 let interactions = [];
@@ -31,6 +20,7 @@ let lastSnapshot = {};
 let snapshotCount = 0;
 let checkSnapshot = false;
 let metaData = {};
+let start_timestamp = -1;
 
 let _native = {};
 let _log = {};
@@ -47,7 +37,6 @@ function takeSnapshot() {
     if (typeof rrwebSnapshot !== "undefined") {
         const [snap] = rrwebSnapshot.snapshot(document);
         const content = JSON.stringify({'snap': snap, 'user_session': user_session, 'page_count': page_count});
-        console.log(content);
         fetch("http://localhost:8000", {
             method: 'PUT',
             body: content
@@ -108,6 +97,34 @@ function logEvents() {
     events = [];
 }
 
+function addRecordBar() {
+    const record_bar = document.createElement('div');
+    record_bar.style.position = 'fixed';
+    record_bar.style.backgroundColor = '#CFD8DC';
+    record_bar.style.opacity = '0.5';
+    record_bar.style.width = '100%';
+    record_bar.style.height = '25px';
+    record_bar.style.left = '5px';
+    record_bar.style.top = '0px';
+    record_bar.style.zIndex = '99999';
+    record_bar.style.fontSize = 'medium';
+    record_bar.style.fontWeight = 'bold';
+    document.body.appendChild(record_bar);
+    const counter = setInterval(function() {
+        const now = new Date().getTime();
+        const seconds = Math.floor((start_timestamp - now + 120000) / 1000);
+        if (seconds > 0) {
+            record_bar.innerHTML = "Recording in progress: " + seconds + "s left";
+        } else {
+            record_bar.innerHTML = "Recording finished. Now you can close the page.";
+            if (server_on) {
+                server_on = false;
+                sendFinalData();
+            }
+        }
+    }, 250);
+}
+
 function waitForConnection() {
     // Get status of the server to check whether it is on or not
     fetch("http://localhost:8000", {
@@ -115,7 +132,6 @@ function waitForConnection() {
         body: 'Server Status'
     }).then(response => response.text())
         .then(function(text) {
-            console.log(text);
             if (text.startsWith("Server On")) {
                 if (!first_load) {
                     alert("Recording started");
@@ -124,9 +140,13 @@ function waitForConnection() {
                 const arr = text.split(/-/g).slice(1);
                 user_session = arr[0];
                 page_count = arr[1];
+                start_timestamp = parseInt(arr[2]);
                 server_on = true;
-                console.log(user_session);
-                console.log(page_count);
+                console.log("User Session: " + user_session);
+                console.log("Page Count: " + page_count);
+                console.log("Start Timestamp: " + start_timestamp.toString())
+                // Add Recording Indicating Bar at the top
+                addRecordBar();
                 // Set initial metadata for the webpage
                 setInitialMetaData();
                 // Take a snapshot of the initial page
@@ -161,9 +181,11 @@ function waitForConnection() {
 window.addEventListener('keydown', function(e){
     if (e.shiftKey && e.altKey && e.key.toLowerCase() === "s") {
         console.log("Shortcut Press detected");
+        const now = new Date().getTime();
+        const reqBody = 'Toggle Status-' + now.toString();
         fetch("http://localhost:8000", {
             method: 'POST',
-            body: 'Toggle Status'
+            body: reqBody
         }).then(response => response.text())
         .then(function(text) {
             console.log(text);
@@ -185,14 +207,12 @@ function sendFinalData() {
         'user_session': user_session, 'page_count': page_count});
     const finalMetaData = JSON.stringify({'metaData': metaData,
         'user_session': user_session, 'page_count': page_count})
-    // console.log(eventContent)
     fetch("http://localhost:8000", {
         method: 'PUT',
         body: nondeterminism
     }).then((response) => {
         console.log(response);
     });
-    // console.log(eventContent)
     fetch("http://localhost:8000", {
         method: 'PUT',
         body: eventContent
@@ -255,7 +275,6 @@ const global = window;
 
 function capture_random() {
     const result = _native.random();
-    console.log(result);
     _log.random.push(result);
     return result;
 }
@@ -263,13 +282,6 @@ function capture_random() {
 function getHandlerFn(type, fn, id) {
     return function () {
         _log.events.push({
-            type: type,
-            details: {
-                id: id
-            },
-            time: _native.Date.now()
-        });
-        console.log({
             type: type,
             details: {
                 id: id
@@ -326,12 +338,6 @@ capture_Date.parse = global.Date.parse.bind(global.Date);
 capture_Date.now = function capture_Date_now () {
     const now = _native.Date.now();
     const date = new _native.Date(now);
-    console.log("Date: "+date.getDate()+
-        "/"+(date.getMonth()+1)+
-        "/"+date.getFullYear()+
-        " "+date.getHours()+
-        ":"+date.getMinutes()+
-        ":"+date.getSeconds());
     _log.dates.push(now);
     return now;
 };

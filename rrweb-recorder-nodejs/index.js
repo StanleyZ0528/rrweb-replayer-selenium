@@ -8,6 +8,7 @@ global.snapCounter = 0;
 global.recordCounter = 0;
 global.sessionCount = 0;
 global.pageCounter = 0;
+global.sessionTimeMap = new Map();
 
 app.get('/', (req, res) => {
     fs_promise.readFile(__dirname + "/index.html")
@@ -48,7 +49,7 @@ app.post('/', (req, res) => {
             res.writeHead(200, {'Content-Type': 'text/plain'});
             if (global.sessionStart) {
                 res.write("Server On: Session-" + global.sessionCount.toString() + "-"
-                    + global.pageCounter.toString());
+                    + global.pageCounter.toString() + "-" + global.sessionTimeMap.get(global.sessionCount));
                 res.end();
                 global.pageCounter += 1;
                 console.log('Session already started...');
@@ -57,14 +58,18 @@ app.post('/', (req, res) => {
                 res.end();
                 console.log(`Session not started...`);
             }
-        } else if (s === "Toggle Status") {
+        } else if (s.startsWith("Toggle Status")) {
             global.sessionStart = !global.sessionStart;
+            const arr = s.split(/-/g).slice(1);
+            const start_timestamp = arr[0];
+            console.log(start_timestamp);
             res.writeHead(200, {'Content-Type': 'text/plain'});
             if (global.sessionStart) {
-                res.write("Server On");
+                res.write("Server On-" + start_timestamp.toString());
                 res.end();
                 console.log('Start Session...');
                 global.sessionCount += 1;
+                global.sessionTimeMap.set(global.sessionCount, start_timestamp);
                 global.snapCounter = 0;
                 global.recordCounter = 0;
                 global.pageCounter = 0;

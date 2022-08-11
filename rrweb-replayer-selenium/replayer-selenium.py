@@ -606,7 +606,7 @@ class EventReader:
 
 
 if __name__ == '__main__':
-    user_session_to_replay = 2
+    user_session_to_replay = 1
     eventReadInstance = EventReader('../rrweb-replayer-nodejs/results/user_session' + str(user_session_to_replay) + '/',
                                     user_session_to_replay)
     trio.run(eventReadInstance.main)
