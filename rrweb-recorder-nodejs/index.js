@@ -1,12 +1,23 @@
 const express = require('express');
 const app = express();
-const port = 8000;
+const port = parseInt(process.argv.slice(2)[0]);
 const fs = require('fs');
 const fs_promise = require('fs').promises;
+if (!fs.existsSync('results/count.txt')) {
+    console.log("Creating new file to save user session count...");
+    fs.writeFileSync('results/count.txt', "0");
+    global.sessionCount = 0;
+    console.log("User session Count: " + global.sessionCount.toString());
+} else {
+    console.log("Getting user session count...");
+    const data = fs.readFileSync('results/count.txt',
+        {encoding:'utf8', flag:'r'});
+    global.sessionCount = parseInt(data);
+    console.log("User session Count: " + global.sessionCount.toString());
+}
 global.sessionStart = false;
 global.snapCounter = 0;
 global.recordCounter = 0;
-global.sessionCount = 0;
 global.pageCounter = 0;
 global.sessionTimeMap = new Map();
 
@@ -22,17 +33,6 @@ app.get('/', (req, res) => {
             res.end(err);
             return;
         });
-    const { exec } = require('child_process');
-    exec('vncserver :2', (err, stdout, stderr) => {
-        if (err) {
-            //some err occurred
-            console.error(err)
-        } else {
-            // the *entire* stdout and stderr (buffered)
-            console.log(`stdout: ${stdout}`);
-            console.log(`stderr: ${stderr}`);
-        }
-    });
 })
 
 app.post('/', (req, res) => {
@@ -68,7 +68,10 @@ app.post('/', (req, res) => {
                 res.write("Server On-" + start_timestamp.toString());
                 res.end();
                 console.log('Start Session...');
-                global.sessionCount += 1;
+                const data = fs.readFileSync('results/count.txt',
+                    {encoding:'utf8', flag:'r'});
+                global.sessionCount = parseInt(data) + 1;
+                fs.writeFileSync('results/count.txt', global.sessionCount.toString());
                 global.sessionTimeMap.set(global.sessionCount, start_timestamp);
                 global.snapCounter = 0;
                 global.recordCounter = 0;
