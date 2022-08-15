@@ -8,6 +8,8 @@ rrweb_snapshot_js.setAttribute('src',
     'https://cdn.jsdelivr.net/gh/StanleyZ0528/rrweb-replayer-selenium@latest/rrweb-scripts/rrweb_snapshot.js');
 document.head.appendChild(rrweb_snapshot_js);
 
+const recorder_port = 8001;
+
 let events = [];
 let entire_events = [];
 let interactions = [];
@@ -37,7 +39,7 @@ function takeSnapshot() {
     if (typeof rrwebSnapshot !== "undefined") {
         const [snap] = rrwebSnapshot.snapshot(document);
         const content = JSON.stringify({'snap': snap, 'user_session': user_session, 'page_count': page_count});
-        fetch("http://localhost:8000", {
+        fetch("http://localhost:" + recorder_port.toString(), {
             method: 'PUT',
             body: content
         });
@@ -72,7 +74,7 @@ function startRecord() {
                     if (checkSnapshot && server_on) {
                         const snapshotContent = JSON.stringify({'lastSnapshot': lastSnapshot,
                             'user_session': user_session, 'page_count': page_count, 'snapshotCount': snapshotCount});
-                        fetch("http://localhost:8000", {
+                        fetch("http://localhost:" + recorder_port.toString(), {
                             method: 'PUT',
                             body: snapshotContent
                         });
@@ -127,7 +129,7 @@ function addRecordBar() {
 
 function waitForConnection() {
     // Get status of the server to check whether it is on or not
-    fetch("http://localhost:8000", {
+    fetch("http://localhost:" + recorder_port.toString(), {
         method: 'POST',
         body: 'Server Status'
     }).then(response => response.text())
@@ -154,7 +156,6 @@ function waitForConnection() {
                 // Start rrweb recording
                 startRecord();
                 window.addEventListener("beforeunload", (event) => {
-                    // navigator.sendBeacon("http://localhost:8000", "Beacon Test")
                     if (!server_on) {
                         return true;
                     }
@@ -183,7 +184,7 @@ window.addEventListener('keydown', function(e){
         console.log("Shortcut Press detected");
         const now = new Date().getTime();
         const reqBody = 'Toggle Status-' + now.toString();
-        fetch("http://localhost:8000", {
+        fetch("http://localhost:" + recorder_port.toString(), {
             method: 'POST',
             body: reqBody
         }).then(response => response.text())
@@ -207,19 +208,19 @@ function sendFinalData() {
         'user_session': user_session, 'page_count': page_count});
     const finalMetaData = JSON.stringify({'metaData': metaData,
         'user_session': user_session, 'page_count': page_count})
-    fetch("http://localhost:8000", {
+    fetch("http://localhost:" + recorder_port.toString(), {
         method: 'PUT',
         body: nondeterminism
     }).then((response) => {
         console.log(response);
     });
-    fetch("http://localhost:8000", {
+    fetch("http://localhost:" + recorder_port.toString(), {
         method: 'PUT',
         body: eventContent
     }).then((response) => {
         console.log(response);
     });
-    fetch("http://localhost:8000", {
+    fetch("http://localhost:" + recorder_port.toString(), {
         method: 'PUT',
         body: finalMetaData
     }).then((response) => {

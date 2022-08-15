@@ -3,14 +3,14 @@ const app = express();
 const port = parseInt(process.argv.slice(2)[0]);
 const fs = require('fs');
 const fs_promise = require('fs').promises;
-if (!fs.existsSync('results/count.txt')) {
+if (!fs.existsSync(__dirname + '/results/count.txt')) {
     console.log("Creating new file to save user session count...");
     fs.writeFileSync('results/count.txt', "0");
     global.sessionCount = 0;
     console.log("User session Count: " + global.sessionCount.toString());
 } else {
     console.log("Getting user session count...");
-    const data = fs.readFileSync('results/count.txt',
+    const data = fs.readFileSync(__dirname + '/results/count.txt',
         {encoding:'utf8', flag:'r'});
     global.sessionCount = parseInt(data);
     console.log("User session Count: " + global.sessionCount.toString());
@@ -68,10 +68,10 @@ app.post('/', (req, res) => {
                 res.write("Server On-" + start_timestamp.toString());
                 res.end();
                 console.log('Start Session...');
-                const data = fs.readFileSync('results/count.txt',
+                const data = fs.readFileSync(__dirname + '/results/count.txt',
                     {encoding:'utf8', flag:'r'});
                 global.sessionCount = parseInt(data) + 1;
-                fs.writeFileSync('results/count.txt', global.sessionCount.toString());
+                fs.writeFileSync(__dirname + '/results/count.txt', global.sessionCount.toString());
                 global.sessionTimeMap.set(global.sessionCount, start_timestamp);
                 global.snapCounter = 0;
                 global.recordCounter = 0;
@@ -108,7 +108,7 @@ app.put('/', (req, res) => {
         console.log(page_count)
         if (s.startsWith('{"entire_events":')) {
             const fs = require('fs');
-            const dir = `results/user_session${user_session}`;
+            const dir = __dirname + `/results/user_session${user_session}`;
             if (!fs.existsSync(dir)){
                 fs.mkdirSync(dir);
             }
@@ -119,7 +119,7 @@ app.put('/', (req, res) => {
             });
         } else if (s.startsWith('{"snap":')) {
             const fs = require('fs');
-            const dir = `results/user_session${user_session}`;
+            const dir = __dirname + `/results/user_session${user_session}`;
             if (!fs.existsSync(dir)){
                 fs.mkdirSync(dir);
             }
@@ -131,7 +131,7 @@ app.put('/', (req, res) => {
             });
         } else if (s.startsWith('{"lastSnapshot":')) {
             const fs = require('fs');
-            const dir = `results/user_session${user_session}`;
+            const dir = __dirname + `/results/user_session${user_session}`;
             if (!fs.existsSync(dir)){
                 fs.mkdirSync(dir);
             }
@@ -147,7 +147,7 @@ app.put('/', (req, res) => {
             });
         } else if (s.startsWith('{"nondeterminism":')){
             const fs = require('fs');
-            const dir = `results/user_session${user_session}`;
+            const dir = __dirname + `/results/user_session${user_session}`;
             if (!fs.existsSync(dir)){
                 fs.mkdirSync(dir);
             }
@@ -158,7 +158,7 @@ app.put('/', (req, res) => {
             });
         } else if (s.startsWith('{"metaData":')){
             const fs = require('fs');
-            const dir = `results/user_session${user_session}`;
+            const dir = __dirname + `/results/user_session${user_session}`;
             if (!fs.existsSync(dir)){
                 fs.mkdirSync(dir);
             }
