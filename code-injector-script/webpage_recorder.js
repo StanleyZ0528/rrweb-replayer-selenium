@@ -103,7 +103,7 @@ function addRecordBar() {
     const record_bar = document.createElement('div');
     record_bar.style.position = 'fixed';
     record_bar.style.backgroundColor = '#CFD8DC';
-    record_bar.style.opacity = '0.5';
+    record_bar.style.opacity = '0.8';
     record_bar.style.width = '100%';
     record_bar.style.height = '25px';
     record_bar.style.left = '5px';
@@ -115,14 +115,22 @@ function addRecordBar() {
     const counter = setInterval(function() {
         const now = new Date().getTime();
         const seconds = Math.floor((start_timestamp - now + 120000) / 1000);
-        if (seconds > 0) {
-            record_bar.innerHTML = "Recording in progress: " + seconds + "s left";
+        if (first_load) {
+            record_bar.innerHTML = "Press alt+shift+s to start recording. Recording session will last for 120s."
+        }
+        else if (seconds > 0 && server_on) {
+            record_bar.innerHTML = "Recording in progress: " + seconds + "s left. " +
+                "Press alt+shift+k to end recording early.";
         } else {
             record_bar.innerHTML = "Recording finished. Now you can close the page.";
             if (server_on) {
                 server_on = false;
                 sendFinalData();
             }
+            /*const time = Date.now();
+            while ((Date.now() - time) < 2000) {
+            }
+            close();*/
         }
     }, 250);
 }
@@ -135,9 +143,10 @@ function waitForConnection() {
     }).then(response => response.text())
         .then(function(text) {
             if (text.startsWith("Server On")) {
-                if (!first_load) {
+                if (first_load) {
                     alert("Recording started");
                 }
+                first_load = false;
                 // const replaced = text.replace(/\D/g, '');
                 const arr = text.split(/-/g).slice(1);
                 user_session = arr[0];
@@ -147,8 +156,6 @@ function waitForConnection() {
                 console.log("User Session: " + user_session);
                 console.log("Page Count: " + page_count);
                 console.log("Start Timestamp: " + start_timestamp.toString())
-                // Add Recording Indicating Bar at the top
-                addRecordBar();
                 // Set initial metadata for the webpage
                 setInitialMetaData();
                 // Take a snapshot of the initial page
@@ -170,17 +177,13 @@ function waitForConnection() {
                 setInterval(logEvents, 10 * 1000);
                 // Neither keepalive nor sendBeacon is working to send back request on page unload
             } else {
-                if (first_load) {
-                    first_load = false;
-                    alert("Connected to the recorder server, press alt+shift+s to start recording")
-                }
                 setTimeout(waitForConnection, 250);
             }
         });
 }
 
 window.addEventListener('keydown', function(e){
-    if (e.shiftKey && e.altKey && e.key.toLowerCase() === "s") {
+    if (e.shiftKey && e.altKey && e.key.toLowerCase() === "s" && !server_on && first_load) {
         console.log("Shortcut Press detected");
         const now = new Date().getTime();
         const reqBody = 'Toggle Status-' + now.toString();
@@ -190,12 +193,25 @@ window.addEventListener('keydown', function(e){
         }).then(response => response.text())
         .then(function(text) {
             console.log(text);
-            if (text === "Server Off") {
-                sendFinalData();
-                server_on = false;
-                alert("Finish Recording, wait a few seconds before you can leave the page")
-            }
         });
+        console.log("Toggle Session status finished");
+    }
+    if (e.shiftKey && e.altKey && e.key.toLowerCase() === "k" && server_on) {
+        console.log("Shortcut Press detected");
+        const now = new Date().getTime();
+        const reqBody = 'Toggle Status-' + now.toString();
+        fetch("http://localhost:" + recorder_port.toString(), {
+            method: 'POST',
+            body: reqBody
+        }).then(response => response.text())
+            .then(function(text) {
+                console.log(text);
+                if (text === "Server Off") {
+                    sendFinalData();
+                    server_on = false;
+                    alert("Finish Recording, wait a few seconds before you can leave the page")
+                }
+            });
         console.log("Toggle Session status finished");
     }
 }, false);
@@ -392,4 +408,7 @@ setTimeout = capture_setTimeout;
 setInterval = capture_setInterval;
 Date = capture_Date;
 
+// Add Recording Indicating Bar at the top
+addRecordBar();
+// Wait for connection to our recording server
 waitForConnection();

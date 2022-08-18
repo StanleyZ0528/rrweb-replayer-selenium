@@ -1,7 +1,10 @@
 const express = require('express');
 const app = express();
 const port = parseInt(process.argv.slice(2)[0]);
+// Proxy port number is always 920 smaller than recorder port (see startup script)
+const proxy_port = port - 920;
 const fs = require('fs');
+const {execSync} = require("child_process");
 const fs_promise = require('fs').promises;
 if (!fs.existsSync(__dirname + '/results/count.txt')) {
     console.log("Creating new file to save user session count...");
@@ -20,6 +23,7 @@ global.snapCounter = 0;
 global.recordCounter = 0;
 global.pageCounter = 0;
 global.sessionTimeMap = new Map();
+global.startTime = 0;
 
 app.get('/', (req, res) => {
     fs_promise.readFile(__dirname + "/index.html")
@@ -76,6 +80,19 @@ app.post('/', (req, res) => {
                 global.snapCounter = 0;
                 global.recordCounter = 0;
                 global.pageCounter = 0;
+                global.startTime = new Date().getTime();
+
+                const time = Date.now();
+                while ((Date.now() - time) < 2000) {
+                }
+                const proxy = setInterval(function() {
+                    const now = new Date().getTime();
+                    const seconds = Math.floor((global.startTime - now + 123000) / 1000);
+                    if (seconds < 0 || global.sessionStart == false) {
+                        const {execSync} = require("child_process");
+                        const stdout = execSync("fuser -n tcp -k -2 " + proxy_port.toString());
+                    }
+                }, 1000);
             } else {
                 res.write("Server Off");
                 res.end();
