@@ -48,5 +48,5 @@ To start vncserver-starter webserver:
 - Port number 8100 is used for vncserver-starter web server which is an external port for client to connect
 - Port number 6081-6090 are reserved for novnc services
 - Port number 8001-8010 are reserved for recording servers
-- Port number 5901-5910 are reserved for concurrent vnservers running at the same time
+- Port number 5901-5910 are reserved for concurrent vncservers
 - Port number 8000 is used for replaying server
