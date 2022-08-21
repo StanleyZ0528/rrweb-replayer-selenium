@@ -8,22 +8,24 @@ const {execSync} = require("child_process");
 const fs_promise = require('fs').promises;
 if (!fs.existsSync(__dirname + '/results/count.txt')) {
     console.log("Creating new file to save user session count...");
-    fs.writeFileSync('results/count.txt', "0");
-    global.sessionCount = 0;
+    fs.writeFileSync('results/count.txt', "1");
+    global.sessionCount = 1;
     console.log("User session Count: " + global.sessionCount.toString());
 } else {
     console.log("Getting user session count...");
     const data = fs.readFileSync(__dirname + '/results/count.txt',
         {encoding:'utf8', flag:'r'});
-    global.sessionCount = parseInt(data);
+    global.sessionCount = parseInt(data) + 1;
+    fs.writeFileSync(__dirname + '/results/count.txt', global.sessionCount.toString());
     console.log("User session Count: " + global.sessionCount.toString());
 }
 global.sessionStart = false;
 global.snapCounter = 0;
 global.recordCounter = 0;
 global.pageCounter = 0;
-global.sessionTimeMap = new Map();
+global.sessionTime = 0;
 global.startTime = 0;
+global.sessionCheck = true;
 
 app.get('/', (req, res) => {
     fs_promise.readFile(__dirname + "/index.html")
@@ -53,7 +55,7 @@ app.post('/', (req, res) => {
             res.writeHead(200, {'Content-Type': 'text/plain'});
             if (global.sessionStart) {
                 res.write("Server On: Session-" + global.sessionCount.toString() + "-"
-                    + global.pageCounter.toString() + "-" + global.sessionTimeMap.get(global.sessionCount));
+                    + global.pageCounter.toString() + "-" + global.sessionTime);
                 res.end();
                 global.pageCounter += 1;
                 console.log('Session already started...');
@@ -63,23 +65,17 @@ app.post('/', (req, res) => {
                 console.log(`Session not started...`);
             }
         } else if (s.startsWith("Toggle Status")) {
-            global.sessionStart = !global.sessionStart;
             const arr = s.split(/-/g).slice(1);
             const start_timestamp = arr[0];
             console.log(start_timestamp);
             res.writeHead(200, {'Content-Type': 'text/plain'});
-            if (global.sessionStart) {
+            if (!global.sessionStart && global.sessionCheck) {
+                global.sessionStart = !global.sessionStart;
+                global.sessionCheck = false;
                 res.write("Server On-" + start_timestamp.toString());
                 res.end();
                 console.log('Start Session...');
-                const data = fs.readFileSync(__dirname + '/results/count.txt',
-                    {encoding:'utf8', flag:'r'});
-                global.sessionCount = parseInt(data) + 1;
-                fs.writeFileSync(__dirname + '/results/count.txt', global.sessionCount.toString());
-                global.sessionTimeMap.set(global.sessionCount, start_timestamp);
-                global.snapCounter = 0;
-                global.recordCounter = 0;
-                global.pageCounter = 0;
+                global.sessionTime = start_timestamp;
                 global.startTime = new Date().getTime();
 
                 const time = Date.now();

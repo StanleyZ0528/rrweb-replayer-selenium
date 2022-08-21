@@ -23,6 +23,7 @@ let snapshotCount = 0;
 let checkSnapshot = false;
 let metaData = {};
 let start_timestamp = -1;
+let connected = true;
 
 let _native = {};
 let _log = {};
@@ -143,9 +144,10 @@ function waitForConnection() {
     }).then(response => response.text())
         .then(function(text) {
             if (text.startsWith("Server On")) {
-                if (first_load) {
+                if (!connected) {
                     alert("Recording started");
                 }
+                connected = true;
                 first_load = false;
                 // const replaced = text.replace(/\D/g, '');
                 const arr = text.split(/-/g).slice(1);
@@ -177,6 +179,7 @@ function waitForConnection() {
                 setInterval(logEvents, 10 * 1000);
                 // Neither keepalive nor sendBeacon is working to send back request on page unload
             } else {
+                connected = false;
                 setTimeout(waitForConnection, 250);
             }
         });
