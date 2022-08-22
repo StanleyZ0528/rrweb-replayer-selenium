@@ -24,6 +24,7 @@ let checkSnapshot = false;
 let metaData = {};
 let start_timestamp = -1;
 let connected = true;
+let server_off = false;
 
 let _native = {};
 let _log = {};
@@ -123,10 +124,13 @@ function addRecordBar() {
             record_bar.innerHTML = "Recording in progress: " + seconds + "s left. " +
                 "Press alt+shift+k to end recording early.";
         } else {
-            record_bar.innerHTML = "Recording finished. Now you can close the page.";
+            if (server_off) {
+                record_bar.innerHTML = "Recording finished. Now you can close the page.";
+            }
             if (server_on) {
                 server_on = false;
                 sendFinalData();
+                server_off = true;
             }
             /*const time = Date.now();
             while ((Date.now() - time) < 2000) {
@@ -211,6 +215,7 @@ window.addEventListener('keydown', function(e){
                 console.log(text);
                 if (text === "Server Off") {
                     sendFinalData();
+                    server_off = true;
                     server_on = false;
                     alert("Finish Recording, wait a few seconds before you can leave the page")
                 }

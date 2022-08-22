@@ -90,6 +90,7 @@ app.post('/', (req, res) => {
                     }
                 }, 1000);
             } else {
+                global.sessionStart = false;
                 res.write("Server Off");
                 res.end();
                 console.log(`End Session...`);
