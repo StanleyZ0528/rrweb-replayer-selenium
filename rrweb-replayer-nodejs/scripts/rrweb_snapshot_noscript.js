@@ -1,4 +1,4 @@
-var rrwebSnapshot = (function (exports) {
+var rrwebSnapshotNoscript = (function (exports) {
     'use strict';
 
     exports.NodeType = void 0;
@@ -523,9 +523,9 @@ var rrwebSnapshot = (function (exports) {
                     }
                     textContent = absoluteToStylesheet(textContent, getHref());
                 }
-                // if (isScript) {
-                //     textContent = 'SCRIPT_PLACEHOLDER';
-                // }
+                if (isScript) {
+                    textContent = 'SCRIPT_PLACEHOLDER';
+                }
                 if (!isStyle &&
                     !isScript &&
                     needMaskingText(n, maskTextClass, maskTextSelector) &&
@@ -1297,7 +1297,7 @@ var rrwebSnapshot = (function (exports) {
     }
 
     var tagMap = {
-        script: 'script',
+        script: 'noscript',
         altglyph: 'altGlyph',
         altglyphdef: 'altGlyphDef',
         altglyphitem: 'altGlyphItem',

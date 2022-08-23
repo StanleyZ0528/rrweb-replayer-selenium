@@ -1,4 +1,4 @@
-function rebuildSnapshot(filename) {
+function rebuildSnapshot(filename, withScript) {
     fetch(filename)
     .then(response => {return response.json();})
     .then(data => {
@@ -17,7 +17,11 @@ function rebuildSnapshot(filename) {
         rrweb_record_js.setAttribute('src',
             'scripts/rrweb.min.js');
         document.head.appendChild(rrweb_record_js);
-        const snapshot = rrwebSnapshot.rebuild(snap, { doc: document })[0];
+        if (withScript) {
+            const snapshot = rrwebSnapshot.rebuild(snap, { doc: document })[0];
+        } else {
+            const snapshot = rrwebSnapshotNoscript.rebuild(snap, {doc: document})[0];
+        }
     })
     .catch(error => console.log('Error: ', error));
 }

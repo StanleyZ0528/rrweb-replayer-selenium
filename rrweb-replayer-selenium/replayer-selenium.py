@@ -23,7 +23,7 @@ def runServer():
 
 
 class EventReader:
-    def __init__(self, path, user_session):
+    def __init__(self, path, user_session, withScript):
         # Use subprocess to start a localhost webpage for replay
         self.server = runServer()
         print("Server[%d] " % (self.server.pid))
@@ -48,6 +48,7 @@ class EventReader:
         self.lastSource = ""
         self.lastSnap = {}
         self.newSnapshot = False
+        self.withScript = withScript
 
     def init_browser(self, proxy_addr=""):
         # Disable webSecurity option for replay
@@ -171,8 +172,10 @@ class EventReader:
         self.element_dict = {}
         for key, events in pairs:
             self.loadDict_recursive(events)
-
-        await self.execute_script("rebuildSnapshot('" + snapshotPath + "');")
+        if self.withScript:
+            await self.execute_script("rebuildSnapshot('" + snapshotPath + "', true);")
+        else:
+            await self.execute_script("rebuildSnapshot('" + snapshotPath + "', false);")
         # self.driver.execute_script("ForbidRedirect();")
         time.sleep(.5)
 
@@ -188,7 +191,10 @@ class EventReader:
         # snapshotPath = os.path.join(self.path, "lastSnapshot" + str(self.currentPage) + "_" + str(self.mutationCounter) + ".json")
 
         print("Rebuilding: %s" % snapshotPath)
-        await self.execute_script("rebuildSnapshot('" + snapshotPath + "');")
+        if self.withScript:
+            await self.execute_script("rebuildSnapshot('" + snapshotPath + "', true);")
+        else:
+            await self.execute_script("rebuildSnapshot('" + snapshotPath + "', false);")
         # Check if mutation event changes the previous snapshot
         snapshotFilePath = os.path.join(self.path, "lastSnapshot" + str(self.currentPage) + "_" + str(
             self.mutationCounter) + ".json")
@@ -219,7 +225,10 @@ class EventReader:
         snapshotPath = "results/user_session" + str(self.user_session) + "/snapshot" + str(self.currentSnapshot) \
                        + ".json"
         print("Rebuilding: %s" % snapshotPath)
-        await self.execute_script("rebuildSnapshot('" + snapshotPath + "');")
+        if self.withScript:
+            await self.execute_script("rebuildSnapshot('" + snapshotPath + "', true);")
+        else:
+            await self.execute_script("rebuildSnapshot('" + snapshotPath + "', false);")
         # Check if mutation event changes the previous snapshot
         newSource = self.driver.page_source
         if newSource != self.lastSource:
@@ -608,5 +617,5 @@ class EventReader:
 if __name__ == '__main__':
     user_session_to_replay = 1
     eventReadInstance = EventReader('../rrweb-replayer-nodejs/results/user_session' + str(user_session_to_replay) + '/',
-                                    user_session_to_replay)
+                                    user_session_to_replay, False)
     trio.run(eventReadInstance.main)

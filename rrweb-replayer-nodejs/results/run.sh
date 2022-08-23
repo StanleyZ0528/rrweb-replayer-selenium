@@ -1,3 +1,3 @@
 #!/bin/bash
-rm -r -f user_session*
-cp -r ../../rrweb-recorder-nodejs/results/* .
+num=$((`cat count.txt`+1))
+echo "dump$num"
