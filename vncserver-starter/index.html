@@ -59,8 +59,9 @@
 <body>
 <div class="center">
   <p>Waiting for vnc server to start...</p>
-  <script>const portNo = "<%= portNo %>";</script>
-  <button onclick="location.href = 'http://10.99.0.231:' + portNo + '/vnc.html?host=vmuser@10.99.0.231&port=' + portNo;" id="myButton">
+  <script>const portNo = "<%= portNo %>";console.log(portNo);</script>
+  <script>const ipAddr = "<%= ipAddr %>";console.log(ipAddr);</script>
+  <button onclick="location.href = 'http://' + ipAddr + ':' + portNo + '/vnc.html?host=vmuser@' + ipAddr + '&port=' + portNo;" id="myButton">
     Click to go to VNCViewer
   </button>
 </div>

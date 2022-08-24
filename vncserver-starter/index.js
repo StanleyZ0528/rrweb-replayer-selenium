@@ -2,6 +2,7 @@ const express = require('express');
 const app = express();
 const port = 8100;
 const fs = require('fs');
+const {execSync} = require("child_process");
 const fs_promise = require('fs').promises;
 
 app.set('view engine', 'html');
@@ -24,6 +25,10 @@ app.get('/webpage/:webpage', (req, res) => {
     const webpageName = req.params.webpage;
     const displayNo = tryPort(2, webpageName);
     const portNo = 6080 + displayNo;
+    const {execSync} = require("child_process");
+    let ipAddr = execSync("hostname -I | awk '{print $1}'", { encoding: 'utf-8' });
+    ipAddr = ipAddr.replace(/(\r\n|\n|\r)/gm, "");
+    console.log(ipAddr);
     /*fs_promise.readFile(__dirname + "/index.html")
         .then(contents => {
             res.setHeader("Content-Type", "text/html");
@@ -36,7 +41,7 @@ app.get('/webpage/:webpage', (req, res) => {
             res.writeHead(500);
             res.end(err);
         });*/
-    res.render(__dirname + "/index.html", {portNo: portNo})
+    res.render(__dirname + "/index.html", {portNo: portNo, ipAddr: ipAddr})
 })
 
 app.listen(port, () => {
