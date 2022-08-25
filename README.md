@@ -50,3 +50,4 @@ To start vncserver-starter webserver:
 - Port number 8001-8010 are reserved for recording servers
 - Port number 5901-5910 are reserved for concurrent vncservers
 - Port number 8000 is used for replaying server
+- Port number 7981-7090 are reserced for proxy servers
