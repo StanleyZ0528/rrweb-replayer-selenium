@@ -6,7 +6,9 @@ done
 echo $PORT
 let DIRNUMBER=$PORT-7080
 let RECORDERPORT=8000+$DIRNUMBER
-let USERSESSION=$((`cat ~/rrweb-replayer-selenium/rrweb-recorder-nodejs/results/count.txt`+1))
-~/Desktop/Projects/rrweb-replayer-selenium/rrweb-recorder-nodejs/proxy/bin/mitmdump -s ~/Desktop/Projects/rrweb-replayer-selenium/rrweb-recorder-nodejs/proxy/mitmproxy/examples/contrib/har_dump.py --set hardump=~/Desktop/Projects/rrweb-replayer-selenium/rrweb-recorder-nodejs/proxy/recordings/har$USERSESSION.out --listen-port=$PORT & > /dev/null
-node ~/Desktop/Projects/rrweb-replayer-selenium/rrweb-recorder-nodejs/index.js $RECORDPORT
-google-chrome 'https://www.youtube.com/' --start-fullscreen --proxy-server="127.0.0.1:$PORT" --disable-site-isolation --disable-web-security --new-window --user-data-dir="~/Desktop/Projects/rrweb-replayer-selenium/data$DIRNUMBER/"
+node /home/vmuser/rrweb-replayer-selenium/rrweb-recorder-nodejs/index.js $RECORDERPORT &
+sleep 1
+let USERSESSION=$((`cat /home/vmuser/rrweb-replayer-selenium/rrweb-recorder-nodejs/results/count.txt`))
+echo $USERSESSION
+/home/vmuser/rrweb-replayer-selenium/rrweb-recorder-nodejs/proxy/bin/mitmdump -s /home/vmuser/rrweb-replayer-selenium/rrweb-recorder-nodejs/proxy/mitmproxy/examples/contrib/har_dump.py --set hardump="/home/vmuser/rrweb-replayer-selenium/rrweb-recorder-nodejs/proxy/recordings/har$USERSESSION.out" --listen-port=$PORT & > /dev/null
+google-chrome 'https://www.youtube.com/' --noerrors --disable-session-crashed-bubble --disable-infobars --kiosk --simulate-outdated-no-au='Tue, 31 Dec 2099 23:59:59 GMT' --test-type --no-default-browser-check --start-fullscreen --proxy-server="127.0.0.1:$PORT" --disable-site-isolation --disable-web-security --new-window --user-data-dir="/home/vmuser/rrweb-replayer-selenium/data$DIRNUMBER/"
