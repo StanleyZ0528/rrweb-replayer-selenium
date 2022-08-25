@@ -26,8 +26,7 @@ app.get('/webpage/:webpage', (req, res) => {
     const displayNo = tryPort(2, webpageName);
     const portNo = 6080 + displayNo;
     const {execSync} = require("child_process");
-    let ipAddr = execSync("hostname -I | awk '{print $1}'", { encoding: 'utf-8' });
-    ipAddr = ipAddr.replace(/(\r\n|\n|\r)/gm, "");
+    let ipAddr = execSync("curl ifconfig.me", { encoding: 'utf-8' });
     console.log(ipAddr);
     /*fs_promise.readFile(__dirname + "/index.html")
         .then(contents => {
