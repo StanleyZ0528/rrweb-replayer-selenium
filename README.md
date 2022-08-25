@@ -38,7 +38,21 @@ To replay the recorded results:
 ### vncserver-starter
 To start vncserver-starter webserver:
 - To start the web server just run `node index.js` under vncserver-starter folder.
-- When requesting this webserver with fields webpage/\<website\>, it will start a vncserver on an available port on our remote machine. Vncserver on startup will open the webpage that is specified in the url. For example, <remote machine ip>:8010/webpage/youtube will open https://www.youtube.com/ by default. List of supported websites to be updated.
+- When requesting this webserver with fields webpage/\<website\>, it will start a vncserver on an available port on our remote machine. Vncserver on startup will open the webpage that is specified in the url. For example, <remote machine ip>:8010/webpage/youtube will open https://www.youtube.com/ by default. 
+- List of supported websites:
+  - medium: https://medium.com/
+  - amazon: https://www.amazon.com/
+  - costco: https://www.costco.com/
+  - tripadvisor: https://www.tripadvisor.com/
+  - expedia: https://www.expedia.com/
+  - cbc: https://www.cbc.ca/
+  - abc: https://abc.com/
+  - youtube: https://www.youtube.com/
+  - twitch: https://www.twitch.tv/
+  - reddit: https://www.reddit.com/
+  - stackoverflow: https://stackoverflow.com/
+  - rtings: https://www.rtings.com/
+  - accuweather: https://www.accuweather.com/
 - On the web page, you can find a button to go the vnc viewer. By clicking on it, it will redirect you to novnc app that serves the vnc session that just started
 ### vnc
 - Copy the files under this folder to vnc config folder `~/.vnc/`, these scripts will be called automatically by vncserver-starter web server
@@ -50,4 +64,4 @@ To start vncserver-starter webserver:
 - Port number 8001-8010 are reserved for recording servers
 - Port number 5901-5910 are reserved for concurrent vncservers
 - Port number 8000 is used for replaying server
-- Port number 7981-7090 are reserced for proxy servers
+- Port number 7081-7090 are reserced for proxy servers
