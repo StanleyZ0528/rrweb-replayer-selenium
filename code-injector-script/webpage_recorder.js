@@ -110,7 +110,7 @@ function addRecordBar() {
     record_bar.style.height = '25px';
     record_bar.style.left = '5px';
     record_bar.style.top = '0px';
-    record_bar.style.zIndex = '99999';
+    record_bar.style.zIndex = '2147483647';
     record_bar.style.fontSize = 'medium';
     record_bar.style.fontWeight = 'bold';
     document.body.appendChild(record_bar);
